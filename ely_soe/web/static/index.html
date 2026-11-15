@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ELY Security Lab &amp; SOE Command Center — Photon Labs</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <!-- Navigation Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">ELY</div>
+      <div>
+        <div class="brand-title">ELY Security Lab</div>
+        <div class="brand-sub">SOE Command Center</div>
+      </div>
+    </div>
+
+    <div class="nav-section-label">Evaluation Planes</div>
+    <nav class="nav-list" id="navList">
+      <button class="nav-btn active" data-view="overview">
+        <span>1. Executive &amp; Maturity Gate</span>
+        <span class="nav-pill" id="pillGate">—</span>
+      </button>
+      <button class="nav-btn" data-view="findings">
+        <span>2. Findings &amp; Validator</span>
+        <span class="nav-pill" id="pillFindings">0</span>
+      </button>
+      <button class="nav-btn" data-view="lifecycle">
+        <span>3. 8-Step Isolated Lifecycle</span>
+        <span class="nav-pill">8/8</span>
+      </button>
+      <button class="nav-btn" data-view="agents">
+        <span>4. Zero-Trust Rogue Agents</span>
+        <span class="nav-pill" id="pillAgents">UA-08</span>
+      </button>
+      <button class="nav-btn" data-view="benchmark">
+        <span>5. GLM 5.3 vs Frontier Bench</span>
+        <span class="nav-pill" id="pillBench">16</span>
+      </button>
+      <button class="nav-btn" data-view="attackgraph">
+        <span>6. Multi-Agent Attack Graph</span>
+        <span class="nav-pill" id="pillGraph">—</span>
+      </button>
+      <button class="nav-btn" data-view="frontier">
+        <span>7. Frontier Research Lab</span>
+        <span class="nav-pill">9 Mods</span>
+      </button>
+      <button class="nav-btn" data-view="compliance">
+        <span>8. Compliance &amp; Schedules</span>
+        <span class="nav-pill">Exports</span>
+      </button>
+    </nav>
+
+    <div class="run-selector-box">
+      <label for="runSelect">Active Audit Run</label>
+      <select id="runSelect"></select>
+      <div class="trust-badge" id="isolationStatusBadge">
+        <span>&#9679;</span> Main Instance Read-Only Verified
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 id="viewHeading">Executive Security Posture &amp; Ely 1.0 Maturity Gate</h1>
+        <div class="topbar-meta" id="topbarMeta">
+          <span>Loading telemetry from ELY Security Orchestration Engine...</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-danger" id="btnQuickV09">Audit v0.9 (Vulnerable)</button>
+        <button class="btn btn-emerald" id="btnQuickV10">Pre-Release Gate v1.0-rc1</button>
+        <button class="btn btn-primary" id="btnOpenLauncher">Custom Audit</button>
+        <button class="btn" id="btnRefresh">Refresh</button>
+      </div>
+    </header>
+
+    <main class="content-wrap">
+      <!-- VIEW 1: EXECUTIVE & MATURITY GATE -->
+      <section class="view-section active" id="view-overview">
+        <div class="grid-kpi" id="kpiStrip"></div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">10 Mandatory Security Domains</div>
+                <div class="panel-sub">Confirmed reproducible findings per domain (Discovery separated from Validation)</div>
+              </div>
+            </div>
+            <div id="domainChart"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Cross-Version Security Evolution</div>
+                <div class="panel-sub">Persistent SQLite longitudinal diff across Ely versions</div>
+              </div>
+              <span class="badge badge-info" id="versionTrajectoryBadge">—</span>
+            </div>
+            <div id="versionDiffCard"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Ely 1.0 Security Maturity Release Gate (9 Verifiable Criteria)</div>
+              <div class="panel-sub">Evidence-backed, Auditor-signed release readiness — not merely executed tests</div>
+            </div>
+            <span class="badge" id="maturityVerdictBadge">—</span>
+          </div>
+          <div class="criteria-grid" id="maturityCriteriaGrid"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: FINDINGS & CLEAN-ROOM VALIDATOR -->
+      <section class="view-section" id="view-findings">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Discovery vs. Independent Validation Findings Ledger</div>
+              <div class="panel-sub">Discovery/model layers can ONLY emit HYPOTHESIS. Only the isolated Independent Validator + Auditor can promote to CONFIRMED.</div>
+            </div>
+            <div id="validationRatioBadges"></div>
+          </div>
+
+          <div class="filter-bar">
+            <input type="text" id="filterSearch" placeholder="Search title, rule_id, file, CWE, OWASP..." />
+            <select id="filterDomain"><option value="">All 10 Domains</option></select>
+            <select id="filterSeverity">
+              <option value="">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select id="filterStatus">
+              <option value="confirmed">Confirmed Only</option>
+              <option value="">All Statuses</option>
+              <option value="false_positive">Rejected False Positives</option>
+              <option value="mitigated">Mitigated (Patch Verified)</option>
+              <option value="hypothesis">Hypotheses</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Domain</th>
+                  <th>Title &amp; Rule ID</th>
+                  <th>Location</th>
+                  <th>CVSS</th>
+                  <th>Validator Proof</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="findingsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: 8-STEP ISOLATED LIFECYCLE -->
+      <section class="view-section" id="view-lifecycle">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">8-Stage Isolated Adversarial Evaluation Lifecycle</div>
+              <div class="panel-sub">Temporary Adversarial Instance: scrubbed snapshot, zero prod creds, zero external egress, zero write access to Ely Main Instance</div>
+            </div>
+            <span class="badge badge-approved" id="lifecycleIntegrityBadge">VERIFIED</span>
+          </div>
+          <div id="snapshotIsolationSummary" style="margin-bottom:16px;"></div>
+          <div class="timeline" id="lifecycleTimeline"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Cryptographic Audit Ledger &amp; One-Way Delivery Attestation</div>
+              <div class="panel-sub">Merkle root &amp; HMAC-SHA256 Auditor plane verification</div>
+            </div>
+          </div>
+          <div class="code-box" id="cryptoAttestationBox"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: ZERO-TRUST ROGUE INTERNAL AGENTS -->
+      <section class="view-section" id="view-agents">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Zero-Trust Untrusted Internal Agent Arena (UA-01 .. UA-08)</div>
+              <div class="panel-sub">Assumes Ely's own researcher, executor, skill, orchestrator, and child processes may be compromised or malicious</div>
+            </div>
+            <span class="badge badge-info" id="agentContainmentBadge">—</span>
+          </div>
+          <div class="criteria-grid" id="untrustedAgentsGrid"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Blue Team Compromise Recovery &amp; Quarantine Drill</div>
+              <div class="panel-sub">Verifies key revocation, memory quarantine, clean checkpoint restoration &amp; main-instance preservation</div>
+            </div>
+          </div>
+          <div class="code-box" id="recoveryDrillBox"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: GLM 5.3 VS FRONTIER BENCHMARK -->
+      <section class="view-section" id="view-benchmark">
+        <div class="grid-kpi" id="benchKpiStrip"></div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Experimental Matrix: GLM 5.3 vs Frontier Models &times; Harness Configurations</div>
+              <div class="panel-sub">Corpus: ELY-Bench-v1.0 (25 ground-truth vulnerabilities across all 10 domains + 10 hardened decoys for FP measurement)</div>
+            </div>
+            <button class="btn btn-primary" id="btnRunBenchmark">Re-Run 16-Cell Matrix</button>
+          </div>
+          <div class="svg-stage" id="benchChartStage" style="margin-bottom:16px;"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Harness Config</th>
+                  <th>TP</th>
+                  <th>FP</th>
+                  <th>FN</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>F1</th>
+                  <th>FDR</th>
+                  <th>Repro Rate</th>
+                  <th>Coverage</th>
+                  <th>Patch Qual</th>
+                  <th>Frontier Index</th>
+                </tr>
+              </thead>
+              <tbody id="benchTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: MULTI-AGENT ATTACK GRAPH -->
+      <section class="view-section" id="view-attackgraph">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Probabilistic Multi-Agent Exploit Graph &amp; Blast Radius</div>
+              <div class="panel-sub">Max-probability kill chains from untrusted entry surfaces to critical Ely assets &amp; Auditor plane</div>
+            </div>
+            <span class="badge" id="graphRiskBadge">—</span>
+          </div>
+          <div class="svg-stage" id="attackGraphSvgStage"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Top Multi-Step Kill Chains</div>
+            </div>
+            <div id="killChainsList"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Min-Cut Remediation Chokepoints (ROI Ranked)</div>
+            </div>
+            <div id="chokepointsList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: FRONTIER RESEARCH WORKBENCH -->
+      <section class="view-section" id="view-frontier">
+        <div class="workbench-grid">
+          <div class="wb-card">
+            <h3>1. Formal Capability Lattice Verifier</h3>
+            <p>Exhaustively checks 6 non-interference theorems (Auditor Unreachability, Workspace/Memory Disjointness, CaMeL CFI, Transitive Delegation Closure).</p>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-emerald btn-sm" onclick="runFrontierTool('policy-verify', {mode:'hardened'})">Verify Hardened Policy</button>
+              <button class="btn btn-danger btn-sm" onclick="runFrontierTool('policy-verify', {mode:'vulnerable'})">Find Counterexamples (v0.9)</button>
+            </div>
+          </div>
+
+          <div class="wb-card">
+            <h3>2. RAG &amp; Episodic Memory Forensics</h3>
+            <p>Runs HMAC provenance verification, imperative-density scoring, TF-IDF semantic outlier detection, surgical quarantine &amp; checkpoint rollback.</p>
+            <button class="btn btn-primary btn-sm" onclick="runFrontierTool('memory-forensics', {})">Run Poisoning &amp; Rollback Drill</button>
+          </div>
+
+          <div class="wb-card">
+            <h3>3. MCP Tool-Poisoning &amp; Rug-Pull Auditor</h3>
+            <p>Audits Model Context Protocol tool schemas for hidden &lt;IMPORTANT&gt; prompt poisoning, covert exfil parameters, cleartext SSE &amp; core shadowing.</p>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-danger btn-sm" onclick="runFrontierTool('mcp-audit', {target_root:'v0_9'})">Audit v0.9 MCP</button>
+              <button class="btn btn-emerald btn-sm" onclick="runFrontierTool('mcp-audit', {target_root:'v1_0_hardened'})">Audit v1.0 MCP</button>
+            </div>
+          </div>
+
+          <div class="wb-card">
+            <h3>4. Guardrail Differential Explorer</h3>
+            <p>Synthesizes URL authority/IPv6 differentials, path prefix-collision probes, regex newline-smuggling &amp; negative-bound bypasses.</p>
+            <button class="btn btn-primary btn-sm" onclick="runFrontierTool('guardrail-diff', {target_root:'v0_9'})">Explore v0.9 Guardrail Bypasses</button>
+          </div>
+
+          <div class="wb-card">
+            <h3>5. Least-Privilege Policy &amp; Seccomp Synthesizer</h3>
+            <p>Generates formally proven Ely capability manifests, OCI Seccomp-BPF syscall kill-lists &amp; cloud-metadata CIDR egress firewalls.</p>
+            <button class="btn btn-primary btn-sm" onclick="runFrontierTool('policy-synthesize', {run_id: state.activeRunId})">Synthesize &amp; Prove Defense Bundle</button>
+          </div>
+
+          <div class="wb-card">
+            <h3>6. Continuous Purple-Team Replay (12 Playbooks)</h3>
+            <p>Replays 12 canonical multi-step agentic attack playbooks comparing v0.9 baseline vs v1.0 hardened resilience.</p>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-danger btn-sm" onclick="runFrontierTool('purple-replay', {target_root:'v0_9'})">Replay vs v0.9</button>
+              <button class="btn btn-emerald btn-sm" onclick="runFrontierTool('purple-replay', {target_root:'v1_0_hardened', baseline_target_root:'v0_9'})">Replay v1.0 vs v0.9 Diff</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title" id="frontierResultTitle">Frontier Workbench Live Telemetry Output</div>
+              <div class="panel-sub">Select any research module above to execute against the isolated lab environment</div>
+            </div>
+            <span class="badge badge-info" id="frontierStatusBadge">READY</span>
+          </div>
+          <div class="code-box" id="frontierOutputBox" style="max-height:520px;">Click any Frontier Research tool above to run live verification...</div>
+        </div>
+      </section>
+
+      <!-- VIEW 8: COMPLIANCE, SCHEDULES & EXPORTS -->
+      <section class="view-section" id="view-compliance">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">One-Way Report &amp; Threat Intelligence Exports</div>
+              <div class="panel-sub">Download signed artifacts for active run (<span class="mono" id="exportRunLabel">—</span>)</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;" id="exportButtonsBar"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">OWASP Agentic AI Top 10 (ASI01–ASI10)</div>
+            </div>
+            <div id="owaspMatrixBox"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">NIST AI RMF &amp; EU AI Act Art. 15 Readiness</div>
+            </div>
+            <div id="nistEuBox"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Modality 1: Permanent Scheduled Audit Policies</div>
+              <div class="panel-sub">Continuous regression surveillance persisted in SOE SQLite history store</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btnTriggerSchedules">Execute Due Scheduled Audits Now</button>
+          </div>
+          <div id="schedulesTableWrap"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Finding Inspector & Live Patch Verification Modal -->
+<div class="modal-backdrop" id="findingModal">
+  <div class="modal-card">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="modalFindingTitle">Finding Inspector</div>
+        <div class="panel-sub mono" id="modalFindingMeta"></div>
+      </div>
+      <button class="btn btn-sm" onclick="closeModal('findingModal')">Close</button>
+    </div>
+    <div id="modalFindingBody"></div>
+  </div>
+</div>
+
+<!-- Custom Audit Launcher Modal -->
+<div class="modal-backdrop" id="launcherModal">
+  <div class="modal-card" style="max-width:560px;">
+    <div class="panel-header">
+      <div class="panel-title">Launch Isolated SOE Security Audit</div>
+      <button class="btn btn-sm" onclick="closeModal('launcherModal')">Close</button>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div>
+        <label class="kpi-label">Authorized Lab Target</label>
+        <select id="launchTarget">
+          <option value="lab_targets/ely_specimen/v0_9">Ely-Cowork v0.9 (Vulnerable Specimen)</option>
+          <option value="lab_targets/ely_specimen/v1_0_hardened">Ely-Cowork v1.0-rc1 (Hardened Specimen)</option>
+        </select>
+      </div>
+      <div class="grid-2" style="margin-bottom:0;">
+        <div>
+          <label class="kpi-label">Audit Modality</label>
+          <select id="launchModality">
+            <option value="on_demand">On-Demand Audit (Modality 2)</option>
+            <option value="pre_release">Pre-Release Maturity Gate (Modality 3)</option>
+          </select>
+        </div>
+        <div>
+          <label class="kpi-label">Version Tag</label>
+          <input type="text" id="launchVersion" value="1.0.0-custom" />
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:0;">
+        <div>
+          <label class="kpi-label">Frontier Cyber Model</label>
+          <select id="launchModel">
+            <option value="glm-5.3">GLM 5.3 (Frontier Cyber)</option>
+            <option value="frontier-cyber-v2">Frontier Cyber v2</option>
+            <option value="frontier-reasoner">Frontier Reasoner</option>
+            <option value="baseline-small">Baseline Small</option>
+          </select>
+        </div>
+        <div>
+          <label class="kpi-label">Harness Profile</label>
+          <select id="launchProfile">
+            <option value="full_soe_harness">full_soe_harness (Complete 6-Stage)</option>
+            <option value="frontier_deep">frontier_deep (Pre-Release Max Depth)</option>
+            <option value="harness_no_validator">harness_no_validator (Ablation)</option>
+            <option value="static_only">static_only (No LLM / No Validator)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+        <button class="btn" onclick="closeModal('launcherModal')">Cancel</button>
+        <button class="btn btn-primary" id="btnSubmitLaunch">Execute Isolated Evaluation</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastBox"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "server_name": "ely-docs-mcp",
+  "transport": "stdio",
+  "endpoint": "https://mcp.ely.local/sse",
+  "resources": [
+    {
+      "uriTemplate": "docs://project/readme.md",
+      "name": "project_readme"
+    }
+  ],
+  "tools": [
+    {
+      "name": "format_markdown",
+      "description": "Formats Markdown documents using standard CommonMark rules.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "Markdown source text to format" }
+        },
+        "required": ["text"]
+      }
+    }
+  ]
+}
