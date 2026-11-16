@@ -52,6 +52,14 @@
         <span>8. Compliance &amp; Schedules</span>
         <span class="nav-pill">Exports</span>
       </button>
+      <button class="nav-btn" data-view="cybersuite">
+        <span>9. Generalized Cyber Suite</span>
+        <span class="nav-pill" id="pillCyber">47 Eng</span>
+      </button>
+      <button class="nav-btn" data-view="harness2">
+        <span>10. Harness&sup2; Meta-Control Lab</span>
+        <span class="nav-pill" id="pillH2">27 Meta</span>
+      </button>
     </nav>
 
     <div class="run-selector-box">
@@ -386,6 +394,116 @@
           <div id="schedulesTableWrap"></div>
         </div>
       </section>
+
+      <!-- VIEW 9: GENERALIZED CYBER SUITE (47 ENGINES) -->
+      <section class="view-section" id="view-cybersuite">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Generalized Enterprise Cybersecurity Suite (47 Specialized Engines)</div>
+              <div class="panel-sub">16 Core Domains + Secrets/DLP + CI/CD PPE Graph + Memory Exploitability + EASM + Ransomware + SaaS SSPM + Sigma/YARA + SOAR + FAIR Risk</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-danger btn-sm" id="btnCyberScanV09">Unified Cyber Scan: v0_9</button>
+              <button class="btn btn-emerald btn-sm" id="btnCyberScanV10">Unified Cyber Scan: v1_0 Hardened</button>
+              <button class="btn btn-primary btn-sm" id="btnCicdSigmaRun">Run CI/CD PPE + Sigma/YARA</button>
+            </div>
+          </div>
+          <div class="muted" id="cyberScanStatus" style="margin-bottom:8px;"></div>
+          <div class="mini-grid" id="cyberCatalogGrid"></div>
+        </div>
+
+        <div id="cyberScanOutput" style="margin-top:14px;"></div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Enterprise Posture &amp; FAIR Financial Risk Simulator</div>
+              <div class="panel-sub">EASM + Ransomware BFS Contagion + 3-2-1-1-0 Immutable Backup + SaaS SSPM + OIDC Federation + FAIR Monte-Carlo (1,200 trials)</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-danger btn-sm" id="btnCyberSimVuln">Simulate Vulnerable Baseline</button>
+              <button class="btn btn-emerald btn-sm" id="btnCyberSimHard">Simulate Hardened Enterprise</button>
+            </div>
+          </div>
+          <div id="cyberEnterpriseSimOutput"><div class="muted">Click a simulation mode above to quantify enterprise ransomware blast radius &amp; FAIR Annual Loss Expectancy (ALE).</div></div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Autonomous SOAR Containment Playbook Executor (Merkle-Sealed + HITL Gated)</div>
+              <div class="panel-sub">Fail-safe dry-run incident containment with rollback commands and SHA-256 ForensicAuditLedger attestation</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+            <select id="soarPlaybookSelect" style="max-width:440px;"></select>
+            <input type="text" id="soarTargetAsset" value="corp-dc-01" placeholder="Target Asset" style="max-width:180px;" />
+            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
+              <input type="checkbox" id="soarAutoHitl" /> Auto-Approve HITL Destructive Steps
+            </label>
+            <button class="btn btn-primary btn-sm" id="btnSoarRun">Execute Audited Playbook</button>
+          </div>
+          <div id="soarExecOutput"></div>
+        </div>
+
+        <div id="cicdSigmaOutput" style="margin-top:14px;"></div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div class="panel-title">Registered Generalized Cyber Suite Capability Matrix</div>
+          </div>
+          <div class="table-wrap" style="max-height:340px; overflow-y:auto;">
+            <table class="data-table">
+              <thead><tr><th>Category</th><th>Engine Class</th><th>Security Coverage Scope</th></tr></thead>
+              <tbody id="cyberEngineTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 10: HARNESS² SECOND-ORDER META-CONTROL LAB -->
+      <section class="view-section" id="view-harness2">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Harness&sup2; Second-Order Adaptive Meta-Control Lab (27 Meta-Subsystems &middot; 34 Stages)</div>
+              <div class="panel-sub">LinUCB Bandits + MAPE-K Live DAG Rewiring + Formal M1&ndash;M8 Proof Certificates + Exact Shapley Attribution + ADTree Solver + Root-Cause Blueprints</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <label style="font-size:12px; color:var(--text-muted);">ADTree Budget ($)</label>
+              <input type="number" id="h2BudgetInput" value="35000" step="5000" style="width:105px;" />
+              <button class="btn btn-danger btn-sm" id="btnH2StudyV09">Full Meta-Study: v0_9</button>
+              <button class="btn btn-emerald btn-sm" id="btnH2StudyV10">Full Meta-Study: v1_0 Hardened</button>
+            </div>
+          </div>
+          <div class="muted" id="h2StatusLine" style="margin-bottom:8px;"></div>
+          <div id="h2StudyOutput"><div class="muted">Launch a Full Meta-Study above to run closed-loop MAPE-K adaptation, M1&ndash;M8 formal safety proofs, Shapley causal attribution, ADTree optimal defense planning, architectural root-cause synthesis &amp; SARIF 2.1 export.</div></div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Harness&sup2; Scientific Benchmarks, Red-Teaming &amp; Fleet Orchestration</div>
+              <div class="panel-sub">Empirically verify adaptive lift, multi-tier curriculum recall, adversarial evasion resilience, and multi-repo fleet scheduling</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" id="btnH2ExpAB">1. Static vs Adaptive A/B Lift</button>
+              <button class="btn btn-primary btn-sm" id="btnH2ExpCurr">2. 5-Tier Curriculum + Hypervolume</button>
+              <button class="btn btn-danger btn-sm" id="btnH2ExpStress">3. Adversarial Evasion Stress-Test</button>
+              <button class="btn btn-emerald btn-sm" id="btnH2ExpFleet">4. Multi-Repo Fleet Sweep</button>
+            </div>
+          </div>
+          <div id="h2ExperimentsOutput"><div class="muted">Select any Harness&sup2; empirical experiment above to run live inside the sandbox.</div></div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div class="panel-title">Harness&sup2; Architecture: 27 Second-Order Meta-Control Subsystems</div>
+          </div>
+          <div class="mini-grid" id="h2SubsystemsGrid"></div>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -463,5 +581,6 @@
 <div class="toast" id="toastBox"></div>
 
 <script src="/static/app.js"></script>
+<script src="/static/cyber_h2_ui.js"></script>
 </body>
 </html>

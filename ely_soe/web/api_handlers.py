@@ -50,6 +50,7 @@ from ely_soe.harness.model_adapters import ModelRegistry
 from ely_soe.harness.reporter import SecurityReporter
 from ely_soe.soe.engine import SecurityOrchestrationEngine
 from ely_soe.soe.scheduler import ScheduledAuditPolicy
+from ely_soe.web.cyber_h2_api import CyberAndHarness2ApiController
 
 
 class SOEApiController:
@@ -62,6 +63,10 @@ class SOEApiController:
     ) -> None:
         self.repo_root = Path(repo_root or Path.cwd()).resolve()
         self.soe = soe if soe is not None else SecurityOrchestrationEngine()
+        self.cyber_h2 = CyberAndHarness2ApiController(
+            repo_root=self.repo_root,
+            data_dir=Path(self.soe.config.data_dir),
+        )
         self.reporter = SecurityReporter()
         self.compliance_mapper = ThreatIntelComplianceMapper()
         self.attack_graph_analyzer = AttackGraphAnalyzer()

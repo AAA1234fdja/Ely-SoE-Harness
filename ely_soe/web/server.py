@@ -138,6 +138,16 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             if path == "/api/benchmarks":
                 self._send_json(self.controller.list_benchmarks())
                 return
+            if path == "/api/cyber/catalog":
+                self._send_json(self.controller.cyber_h2.get_cyber_catalog())
+                return
+            if path == "/api/h2/catalog":
+                self._send_json(self.controller.cyber_h2.get_h2_catalog())
+                return
+            if path == "/api/h2/latest-sarif":
+                content, ctype, fname = self.controller.cyber_h2.export_latest_h2_sarif()
+                self._send_text(content, ctype, download_filename=fname)
+                return
             if path.startswith("/api/export/"):
                 parts = path[len("/api/export/") :].strip("/").split("/")
                 if len(parts) != 2:
@@ -202,6 +212,39 @@ class SOERequestHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/demo/seed":
                 self._send_json(self.controller.seed_demo_workspace())
+                return
+            if path == "/api/cyber/scan":
+                self._send_json(self.controller.cyber_h2.run_cyber_scan(body))
+                return
+            if path == "/api/cyber/enterprise-sim":
+                self._send_json(self.controller.cyber_h2.run_enterprise_sim(body))
+                return
+            if path == "/api/cyber/soar-execute":
+                self._send_json(self.controller.cyber_h2.run_soar_playbook(body))
+                return
+            if path == "/api/cyber/sigma-hunt":
+                self._send_json(self.controller.cyber_h2.run_sigma_yara_hunt(body))
+                return
+            if path == "/api/cyber/cicd-audit":
+                self._send_json(self.controller.cyber_h2.run_cicd_ppe_audit(body))
+                return
+            if path == "/api/h2/study":
+                self._send_json(self.controller.cyber_h2.run_h2_complete_study(body))
+                return
+            if path == "/api/h2/ab-lift":
+                self._send_json(self.controller.cyber_h2.run_h2_ab_lift(body))
+                return
+            if path == "/api/h2/curriculum-bench":
+                self._send_json(self.controller.cyber_h2.run_h2_curriculum_bench(body))
+                return
+            if path == "/api/h2/adversarial-stress":
+                self._send_json(self.controller.cyber_h2.run_h2_adversarial_stress(body))
+                return
+            if path == "/api/h2/fleet-sweep":
+                self._send_json(self.controller.cyber_h2.run_h2_fleet_sweep(body))
+                return
+            if path == "/api/h2/adtree-solve":
+                self._send_json(self.controller.cyber_h2.run_h2_adtree_solve(body))
                 return
 
             self._send_json({"error": f"Unknown endpoint `{path}`"}, HTTPStatus.NOT_FOUND)

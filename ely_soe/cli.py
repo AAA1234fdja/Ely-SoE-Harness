@@ -45,6 +45,13 @@ from ely_soe.soe.engine import SecurityOrchestrationEngine
 from ely_soe.soe.scheduler import ScheduledAuditPolicy
 from ely_soe.web.api_handlers import SOEApiController
 from ely_soe.web.server import create_server
+from ely_soe.cyber import (
+    CANONICAL_SOAR_PLAYBOOKS,
+    CICDPipelineGraphAuditor,
+    EnterpriseCyberSuiteFacade,
+    ThreatHuntingSigmaYaraEngine,
+)
+from ely_soe.harness_squared import HarnessSquaredResearchLabFacade, STAGE_CATALOG
 
 
 def _print_banner(title: str) -> None:
@@ -305,6 +312,159 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_cyber(args: argparse.Namespace) -> int:
+    action = args.cyber_action
+    want_json = bool(getattr(args, "json", False))
+    if not want_json:
+        _print_banner(f"GENERALIZED ENTERPRISE CYBER SUITE: {action.upper()}")
+    facade = EnterpriseCyberSuiteFacade()
+
+    if action == "catalog":
+        cat = facade.catalog_engines()
+        if args.json:
+            print(json.dumps(cat, indent=2))
+            return 0
+        print(f"Total Specialized Engines: {cat['total_specialized_engines']}")
+        for c_name, cnt in sorted(cat["categories"].items()):
+            print(f"  - {c_name:24s}: {cnt} engines")
+        return 0
+
+    if action == "scan":
+        res = facade.run_unified_cyber_scan(
+            args.target,
+            run_sandbox_range=bool(args.sandbox_range),
+            hardened_simulation=bool(args.hardened),
+            include_extended_analyzers=not bool(args.core_only),
+        )
+        if args.json:
+            print(json.dumps(res, indent=2, default=str))
+        else:
+            sev = res["severity_counts"]
+            print(f"Target              : {res['target_name']} ({res['duration_ms']}ms)")
+            print(f"Gate Verdict        : {res['gate_verdict']}")
+            print(f"Overall Posture     : {res['overall_cyber_posture']} / 100")
+            print(f"Findings            : total={res['total_vulnerabilities']} (core={res['core_vulnerabilities']}, ext=+{res['extended_vulnerabilities_added']})")
+            print(f"Severity Breakdown  : crit={sev.get('critical',0)}, high={sev.get('high',0)}, med={sev.get('medium',0)}, low={sev.get('low',0)}")
+            print(f"Compliance Readiness: {res['compliance_readiness_pct']}%")
+            print(f"WAF Virtual Patches : {res['waf_virtual_patches_synthesized']}")
+            print(f"SOAR Playbooks Recs : {len(res['soar_recommended_playbooks'])}")
+        return 0 if res["gate_verdict"] == "APPROVED" else 2
+
+    if action == "enterprise-sim":
+        res = facade.run_enterprise_posture_simulation(hardened=bool(args.hardened))
+        if args.json:
+            print(json.dumps(res, indent=2, default=str))
+            return 0
+        fair = res["fair_financial_risk"]
+        rans = res["ransomware_contagion"]
+        print(f"Mode                 : {res['mode']} ({res['duration_ms']}ms)")
+        print(f"Enterprise Findings  : {res['total_enterprise_findings']}")
+        p95 = fair.get("percentiles_usd", {}).get("p95_var", 0.0)
+        print(f"FAIR Mean ALE        : ${fair['mean_ale_usd']:,.0f} (P95 VaR: ${p95:,.0f})")
+        print(f"Ransomware Blast     : {rans['blast_radius_pct']}% (Tier-0 DC hit: {bool(rans['tier0_dc_compromised'])})")
+        print(f"Backup 3-2-1-1-0     : {res['backup_32110']['resilience_score_pct']}%")
+        print(f"SaaS SSPM Score      : {res['saas_sspm']['overall_sspm_score_pct']}%")
+        print(f"Sigma Detection F1   : {res['sigma_detection_quality']['f1_score']} (FPR={res['sigma_detection_quality']['false_positive_rate']})")
+        return 0
+
+    if action == "soar":
+        res = facade.execute_soar_playbook(
+            playbook_id=args.playbook,
+            incident_id=args.incident_id,
+            target_asset=args.asset,
+            dry_run=not bool(args.live),
+            auto_approve_hitl=bool(args.auto_approve_hitl),
+        )
+        print(json.dumps(res, indent=2, default=str))
+        return 0 if res["ledger_verified"] else 2
+
+    if action == "cicd-audit":
+        auditor = CICDPipelineGraphAuditor()
+        res = auditor.scan_directory(args.target)
+        out = {k: v for k, v in res.items() if k != "vulnerabilities"}
+        out["vulnerabilities"] = [v.to_dict() for v in res["vulnerabilities"]]
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if action == "sigma-hunt":
+        hunt = ThreatHuntingSigmaYaraEngine()
+        mal = [
+            {"Image": "C:\\Windows\\powershell.exe", "CommandLine": "powershell -enc SQBFAFgA...", "User": "CORP\\bob"},
+            {"CommandLine": "vssadmin delete shadows /all /quiet"},
+            {"uri": "/proxy?url=http://169.254.169.254/latest/meta-data/"},
+        ]
+        ben = [{"uri": "/healthz", "query": "ok=1"}]
+        print(json.dumps({"hunt": hunt.hunt_log_stream(mal + ben), "quality": hunt.evaluate_detection_quality(mal, ben)}, indent=2))
+        return 0
+
+    return 1
+
+
+def _cmd_h2(args: argparse.Namespace) -> int:
+    action = args.h2_action
+    want_json = bool(getattr(args, "json", False))
+    if not want_json:
+        _print_banner(f"HARNESS² SECOND-ORDER ADAPTIVE META-CONTROL LAB: {action.upper()}")
+    data_dir = Path(getattr(args, "data_dir", ".ely_soe_data"))
+    data_dir.mkdir(parents=True, exist_ok=True)
+    lab = HarnessSquaredResearchLabFacade(memory_db_path=data_dir / "harness2_meta_memory.sqlite")
+
+    if action == "catalog":
+        cat = lab.catalog_subsystems()
+        cat["first_order_stages"] = len(STAGE_CATALOG)
+        print(json.dumps(cat, indent=2))
+        return 0
+
+    if action == "study":
+        study = lab.run_complete_meta_study(
+            args.target,
+            preferred_profile=args.profile,
+            evolve_pareto=bool(args.evolve_pareto),
+            defense_budget_usd=float(args.budget),
+        )
+        if args.sarif_out:
+            Path(args.sarif_out).write_text(json.dumps(study["sarif_v2_1"], indent=2), encoding="utf-8")
+            print(f"SARIF 2.1.0 report written to: {args.sarif_out}")
+        if args.json:
+            compact = {k: v for k, v in study.items() if k != "sarif_v2_1"}
+            print(json.dumps(compact, indent=2, default=str))
+        else:
+            run = study["harness2_run"]
+            fv = study["formal_meta_verification"]
+            ad = study["attack_defense_tree_optimization"]
+            rc = study["architectural_root_causes"]
+            gov = study["policy_governance_gate"]
+            print(f"Target              : {study['target_name']} ({study['total_study_duration_ms']}ms)")
+            print(f"Harness² Gate       : {run['gate_verdict']} | Governance: {gov['governance_verdict']} ({gov['checks_passed']}/{gov['checks_total']})")
+            print(f"Formal M1-M8 Proof  : {fv['overall_verdict']} ({fv['theorems_passed']}/{fv['theorems_total']}, sig_valid={fv['signature_verified']})")
+            print(f"Findings / Adapt    : {run['total_vulnerabilities']} vulns | {run['mapek_adaptation']['total_adaptations_applied']} live MAPE-K rewrites")
+            print(f"ADTree Defense Plan : spend=${ad['optimal_defense_spend_usd']:,.0f} / ${ad['budget_usd']:,.0f}, risk_cut=-{ad['relative_risk_reduction_pct']}%")
+            print(f"Root-Cause Blueprint: {rc['total_findings_analyzed']} raw -> {rc['systemic_root_causes_identified']} systemic causes ({rc['whack_a_mole_compression_ratio']}x)")
+        return 0 if study["formal_meta_verification"]["overall_verdict"] == "PROVEN_SAFE" else 2
+
+    if action == "ab-lift":
+        res = lab.run_ab_lift_benchmark(args.target, preferred_profile=args.profile)
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "bench":
+        res = lab.run_multi_tier_curriculum_bench(preferred_profile=args.profile)
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "stress":
+        res = lab.run_adversarial_evasion_stress()
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "fleet":
+        res = lab.run_fleet_sweep(force_profile=args.profile)
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    return 1
+
+
 def _print_report_summary(report: Any, artifacts: Dict[str, Any]) -> None:
     mat = report.maturity
     snap = artifacts.get("snapshot_manifest", {})
@@ -426,6 +586,70 @@ def build_parser() -> argparse.ArgumentParser:
     p_srv.add_argument("--port", type=int, default=8080)
     p_srv.add_argument("--no-seed", action="store_true", help="Do not auto-seed v0.9/v1.0 demo runs")
     p_srv.set_defaults(func=_cmd_serve)
+
+    # cyber (Generalized 47-engine Enterprise Cybersecurity Suite)
+    p_cyb = sub.add_parser("cyber", help="Run Generalized Enterprise Cybersecurity Suite (47 engines)")
+    cyb_sub = p_cyb.add_subparsers(dest="cyber_action", required=True)
+    c_cat = cyb_sub.add_parser("catalog", help="List all 47 specialized cybersecurity engines")
+    c_cat.add_argument("--json", action="store_true")
+    c_cat.set_defaults(func=_cmd_cyber)
+    c_scan = cyb_sub.add_parser("scan", help="Run unified 16-domain + extended analyzer scan")
+    c_scan.add_argument("target", help="Path to target repository")
+    c_scan.add_argument("--sandbox-range", action="store_true", help="Include loopback live DAST sandbox range")
+    c_scan.add_argument("--hardened", action="store_true", help="Use hardened enterprise baseline simulation")
+    c_scan.add_argument("--core-only", action="store_true", help="Skip extended Wave I–IV repo analyzers")
+    c_scan.add_argument("--json", action="store_true")
+    c_scan.set_defaults(func=_cmd_cyber)
+    c_sim = cyb_sub.add_parser("enterprise-sim", help="Run EASM + Ransomware + SSPM + FAIR + Sigma enterprise simulation")
+    c_sim.add_argument("--hardened", action="store_true")
+    c_sim.add_argument("--json", action="store_true")
+    c_sim.set_defaults(func=_cmd_cyber)
+    c_soar = cyb_sub.add_parser("soar", help="Execute a Merkle-audited SOAR containment playbook")
+    c_soar.add_argument("--playbook", default="PB-RANSOMWARE-ISOLATION", choices=sorted(CANONICAL_SOAR_PLAYBOOKS.keys()))
+    c_soar.add_argument("--incident-id", default="INC-ELY-CLI-001")
+    c_soar.add_argument("--asset", default="corp-dc-01")
+    c_soar.add_argument("--live", action="store_true")
+    c_soar.add_argument("--auto-approve-hitl", action="store_true")
+    c_soar.add_argument("--json", action="store_true")
+    c_soar.set_defaults(func=_cmd_cyber)
+    c_cicd = cyb_sub.add_parser("cicd-audit", help="Run CI/CD Pipeline Execution-Graph & PPE audit")
+    c_cicd.add_argument("target")
+    c_cicd.add_argument("--json", action="store_true")
+    c_cicd.set_defaults(func=_cmd_cyber)
+    c_sig = cyb_sub.add_parser("sigma-hunt", help="Run Sigma boolean detection & quality benchmark")
+    c_sig.add_argument("--json", action="store_true")
+    c_sig.set_defaults(func=_cmd_cyber)
+
+    # h2 / harness2 (Harness² Second-Order Meta-Control Lab)
+    p_h2 = sub.add_parser("h2", aliases=["harness2"], help="Run Harness² Second-Order Meta-Control Lab (27 subsystems)")
+    h2_sub = p_h2.add_subparsers(dest="h2_action", required=True)
+    h2_cat = h2_sub.add_parser("catalog", help="List all 27 Harness² meta-subsystems & 34 stages")
+    h2_cat.add_argument("--json", action="store_true")
+    h2_cat.set_defaults(func=_cmd_h2)
+    h2_st = h2_sub.add_parser("study", help="Run complete Harness² Meta-Study (M1-M8 + Shapley + ADTree + Root-Cause + SARIF)")
+    h2_st.add_argument("target", help="Target directory path")
+    h2_st.add_argument("--profile", default="fast_ci")
+    h2_st.add_argument("--evolve-pareto", action="store_true")
+    h2_st.add_argument("--budget", type=float, default=35000.0)
+    h2_st.add_argument("--sarif-out", default=None, help="Optional output path for SARIF v2.1.0 JSON")
+    h2_st.add_argument("--json", action="store_true")
+    h2_st.set_defaults(func=_cmd_h2)
+    h2_ab = h2_sub.add_parser("ab-lift", help="Run Static vs Adaptive Harness² controlled A/B lift benchmark")
+    h2_ab.add_argument("target")
+    h2_ab.add_argument("--profile", default="fast_ci")
+    h2_ab.add_argument("--json", action="store_true")
+    h2_ab.set_defaults(func=_cmd_h2)
+    h2_bn = h2_sub.add_parser("bench", help="Run 5-tier Multi-Objective Curriculum & Pareto Hypervolume benchmark")
+    h2_bn.add_argument("--profile", default="fast_ci")
+    h2_bn.add_argument("--json", action="store_true")
+    h2_bn.set_defaults(func=_cmd_h2)
+    h2_str = h2_sub.add_parser("stress", help="Run Self-Adversarial 8-family Evasion Stress-Test ('Red-Teaming the Harness')")
+    h2_str.add_argument("--json", action="store_true")
+    h2_str.set_defaults(func=_cmd_h2)
+    h2_fl = h2_sub.add_parser("fleet", help="Run Distributed Multi-Repo Fleet Sweep & Shared-Dep Blast Radius")
+    h2_fl.add_argument("--profile", default="fast_ci")
+    h2_fl.add_argument("--json", action="store_true")
+    h2_fl.set_defaults(func=_cmd_h2)
 
     return parser
 

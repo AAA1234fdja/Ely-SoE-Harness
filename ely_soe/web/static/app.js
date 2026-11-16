@@ -20,6 +20,8 @@ const VIEW_TITLES = {
   attackgraph: "Probabilistic Multi-Agent Exploit Graph & Chokepoints",
   frontier: "Photon Labs Frontier Cybersecurity Research Workbench",
   compliance: "OWASP Agentic / MITRE ATLAS / NIST AI RMF & Scheduled Audits",
+  cybersuite: "Generalized Enterprise Cybersecurity Suite (40 Specialized Engines)",
+  harness2: "Harness² Second-Order Adaptive Meta-Control Lab (23 Meta-Subsystems)",
 };
 
 const DOMAIN_ORDER = [
