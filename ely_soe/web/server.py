@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import time
 import traceback
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,13 +21,14 @@ from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
 from ely_soe.web.api_handlers import SOEApiController
+from ely_soe.web.security_middleware import WebSecurityMiddleware
 
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 class SOECommandCenterServer(ThreadingHTTPServer):
-    """Multi-threaded HTTP server carrying a shared `SOEApiController`."""
+    """Multi-threaded HTTP server carrying a shared `SOEApiController` and `WebSecurityMiddleware`."""
 
     allow_reuse_address = True
     daemon_threads = True
@@ -37,6 +39,9 @@ class SOECommandCenterServer(ThreadingHTTPServer):
         controller: SOEApiController,
     ) -> None:
         self.controller = controller
+        audit_log = getattr(controller, "data_dir", None)
+        log_path = (Path(audit_log) / "web_api_audit.jsonl") if audit_log else None
+        self.security = WebSecurityMiddleware(audit_log_path=log_path)
         super().__init__(server_address, SOERequestHandler)
 
 
@@ -53,11 +58,18 @@ class SOERequestHandler(BaseHTTPRequestHandler):
     def controller(self) -> SOEApiController:
         return self.server.controller  # type: ignore[attr-defined]
 
+    @property
+    def security(self) -> WebSecurityMiddleware:
+        return self.server.security  # type: ignore[attr-defined]
+
     def _send_common_headers(self, content_type: str, content_length: int, extra: Optional[Dict[str, str]] = None) -> None:
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(content_length))
         self.send_header("Cache-Control", "no-store")
-        # Preview & proxy-friendly CORS + iframe embedding support
+        # Hardened HTTP security headers (iframe-preview compatible)
+        for hk, hv in self.security.security_headers():
+            self.send_header(hk, hv)
+        # Safe CORS: wildcard without credentials (never reflects arbitrary origins with ACAC:true)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
@@ -65,10 +77,10 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             for k, v in extra.items():
                 self.send_header(k, v)
 
-    def _send_json(self, data: Any, status: int = HTTPStatus.OK) -> None:
+    def _send_json(self, data: Any, status: int = HTTPStatus.OK, *, extra: Optional[Dict[str, str]] = None) -> None:
         body = json.dumps(data, indent=2, default=str).encode("utf-8")
         self.send_response(status)
-        self._send_common_headers("application/json; charset=utf-8", len(body))
+        self._send_common_headers("application/json; charset=utf-8", len(body), extra=extra)
         self.end_headers()
         self.wfile.write(body)
 
@@ -92,29 +104,49 @@ class SOERequestHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0:
             return {}
-        if length > 2_000_000:
-            raise ValueError("Request payload exceeds 2 MB safety limit")
+        if length > self.security.max_body_bytes:
+            raise ValueError(f"Request payload exceeds {self.security.max_body_bytes} byte safety limit")
         raw = self.rfile.read(length)
-        if not raw.strip():
-            return {}
-        parsed = json.loads(raw.decode("utf-8"))
-        if not isinstance(parsed, dict):
-            raise ValueError("JSON body must be an object")
-        return parsed
+        return self.security.validate_and_parse_json_body(raw)
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
         self._send_common_headers("text/plain", 0)
         self.end_headers()
 
+    def do_TRACE(self) -> None:
+        self._send_json({"error": "HTTP TRACE method is disabled by security policy."}, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def _local_self_url(self) -> str:
+        port = self.server.server_port
+        return f"http://127.0.0.1:{port}"
+
     def do_GET(self) -> None:
+        t0 = time.perf_counter()
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
+        client_ip = self.client_address[0] if self.client_address else "unknown"
+        status_sent = 200
+
+        allowed, retry_after = self.security.check_rate_limit(client_ip, path, "GET")
+        if not allowed:
+            self._send_json(
+                {"error": "Rate limit exceeded", "retry_after_seconds": retry_after},
+                HTTPStatus.TOO_MANY_REQUESTS,
+                extra={"Retry-After": str(max(1, int(retry_after)))},
+            )
+            self.security.record_request(client_ip=client_ip, method="GET", path=path, status_code=429, latency_ms=(time.perf_counter() - t0) * 1000.0)
+            return
 
         try:
             if path == "/api/health":
-                self._send_json(self.controller.get_health())
+                health = dict(self.controller.get_health())
+                health["security_telemetry"] = self.security.telemetry_snapshot()
+                self._send_json(health)
+                return
+            if path == "/api/security/telemetry":
+                self._send_json(self.security.telemetry_snapshot())
                 return
             if path == "/api/overview":
                 self._send_json(self.controller.get_overview())
@@ -141,6 +173,9 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             if path == "/api/cyber/catalog":
                 self._send_json(self.controller.cyber_h2.get_cyber_catalog())
                 return
+            if path == "/api/cyber/history":
+                self._send_json(self.controller.cyber_h2.get_history_summary())
+                return
             if path == "/api/h2/catalog":
                 self._send_json(self.controller.cyber_h2.get_h2_catalog())
                 return
@@ -151,29 +186,46 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/export/"):
                 parts = path[len("/api/export/") :].strip("/").split("/")
                 if len(parts) != 2:
+                    status_sent = 400
                     self._send_json({"error": "Expected /api/export/{run_id}/{format}"}, HTTPStatus.BAD_REQUEST)
                     return
                 content, ctype, fname = self.controller.export_report(parts[0], parts[1])
                 self._send_text(content, ctype, download_filename=fname)
                 return
 
-            # Static UI routes
-            self._serve_static(path)
+            # Static UI routes (strict traversal / dotfile confinement)
+            status_sent = self._serve_static(path)
         except KeyError as exc:
+            status_sent = 404
             self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
         except PermissionError as exc:
+            status_sent = 403
             self._send_json({"error": str(exc)}, HTTPStatus.FORBIDDEN)
         except (ValueError, FileNotFoundError) as exc:
+            status_sent = 400
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception as exc:
-            self._send_json(
-                {"error": str(exc), "trace": traceback.format_exc(limit=4)},
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            status_sent = 500
+            self._send_json({"error": f"Internal server error ({type(exc).__name__})"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        finally:
+            self.security.record_request(client_ip=client_ip, method="GET", path=path, status_code=status_sent, latency_ms=(time.perf_counter() - t0) * 1000.0)
 
     def do_POST(self) -> None:
+        t0 = time.perf_counter()
         parsed = urlparse(self.path)
         path = parsed.path
+        client_ip = self.client_address[0] if self.client_address else "unknown"
+        status_sent = 200
+
+        allowed, retry_after = self.security.check_rate_limit(client_ip, path, "POST")
+        if not allowed:
+            self._send_json(
+                {"error": "Rate limit exceeded", "retry_after_seconds": retry_after},
+                HTTPStatus.TOO_MANY_REQUESTS,
+                extra={"Retry-After": str(max(1, int(retry_after)))},
+            )
+            self.security.record_request(client_ip=client_ip, method="POST", path=path, status_code=429, latency_ms=(time.perf_counter() - t0) * 1000.0)
+            return
 
         try:
             body = self._read_json_body()
@@ -181,6 +233,7 @@ class SOERequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.controller.run_audit(body))
                 return
             if path == "/api/schedules":
+                status_sent = 201
                 self._send_json(self.controller.create_schedule(body), HTTPStatus.CREATED)
                 return
             if path == "/api/schedules/run-due":
@@ -216,6 +269,24 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             if path == "/api/cyber/scan":
                 self._send_json(self.controller.cyber_h2.run_cyber_scan(body))
                 return
+            if path == "/api/cyber/diff":
+                self._send_json(self.controller.cyber_h2.diff_cyber_scans(body))
+                return
+            if path == "/api/cyber/autopatch":
+                self._send_json(self.controller.cyber_h2.run_verified_autopatch(body))
+                return
+            if path == "/api/cyber/dast-selfcheck":
+                self._send_json(self.controller.cyber_h2.run_dast_selfcheck(body, default_base_url=self._local_self_url()))
+                return
+            if path == "/api/cyber/llm-firewall":
+                self._send_json(self.controller.cyber_h2.run_llm_firewall(body))
+                return
+            if path == "/api/cyber/forensic-bundle":
+                self._send_json(self.controller.cyber_h2.run_forensic_bundle(body))
+                return
+            if path == "/api/cyber/dfir-timeline":
+                self._send_json(self.controller.cyber_h2.run_cyber_dfir_timeline(body))
+                return
             if path == "/api/cyber/enterprise-sim":
                 self._send_json(self.controller.cyber_h2.run_enterprise_sim(body))
                 return
@@ -246,28 +317,60 @@ class SOERequestHandler(BaseHTTPRequestHandler):
             if path == "/api/h2/adtree-solve":
                 self._send_json(self.controller.cyber_h2.run_h2_adtree_solve(body))
                 return
+            if path == "/api/h2/systemic-portfolio":
+                self._send_json(self.controller.cyber_h2.run_h2_systemic_portfolio(body))
+                return
+            if path == "/api/h2/counterfactual-plan":
+                self._send_json(self.controller.cyber_h2.run_h2_counterfactual_plan(body))
+                return
+            if path == "/api/h2/self-diagnostics":
+                self._send_json(self.controller.cyber_h2.run_h2_self_diagnostics())
+                return
+            if path == "/api/h2/synthesize-guardrails":
+                self._send_json(self.controller.cyber_h2.run_h2_synthesize_guardrails(body))
+                return
+            if path == "/api/h2/monotonicity-proof":
+                self._send_json(self.controller.cyber_h2.run_h2_monotonicity_proof(body))
+                return
+            if path == "/api/h2/parallel-pareto":
+                self._send_json(self.controller.cyber_h2.run_h2_parallel_pareto(body))
+                return
 
+            status_sent = 404
             self._send_json({"error": f"Unknown endpoint `{path}`"}, HTTPStatus.NOT_FOUND)
         except KeyError as exc:
+            status_sent = 404
             self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
         except PermissionError as exc:
+            status_sent = 403
             self._send_json({"error": str(exc)}, HTTPStatus.FORBIDDEN)
         except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+            status_sent = 400
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception as exc:
-            self._send_json(
-                {"error": str(exc), "trace": traceback.format_exc(limit=4)},
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            status_sent = 500
+            self._send_json({"error": f"Internal server error ({type(exc).__name__})"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        finally:
+            self.security.record_request(client_ip=client_ip, method="POST", path=path, status_code=status_sent, latency_ms=(time.perf_counter() - t0) * 1000.0)
 
-    def _serve_static(self, req_path: str) -> None:
-        rel = "index.html" if req_path in ("", "/") else req_path.lstrip("/")
-        if rel.startswith("static/"):
-            rel = rel[len("static/") :]
-        target = (STATIC_DIR / rel).resolve()
-        if not target.is_relative_to(STATIC_DIR) or not target.exists() or not target.is_file():
-            # SPA fallback to index.html
-            target = STATIC_DIR / "index.html"
+    def _serve_static(self, req_path: str) -> int:
+        # Explicitly reject sensitive probe paths and traversal attempts with 403/404 instead of SPA 200 fallback
+        raw_clean = req_path or "/"
+        if raw_clean in ("", "/"):
+            target = (STATIC_DIR / "index.html").resolve()
+        else:
+            rel = raw_clean.lstrip("/")
+            if rel.startswith("static/"):
+                rel = rel[len("static/") :]
+            try:
+                target = self.security.resolve_safe_static_file(STATIC_DIR, rel)
+            except PermissionError:
+                self._send_json({"error": "Forbidden static path"}, HTTPStatus.FORBIDDEN)
+                return 403
+            except FileNotFoundError:
+                self._send_json({"error": f"Resource not found: `{raw_clean}`"}, HTTPStatus.NOT_FOUND)
+                return 404
+
         content = target.read_bytes()
         ctype, _ = mimetypes.guess_type(str(target))
         if not ctype:
@@ -278,6 +381,7 @@ class SOERequestHandler(BaseHTTPRequestHandler):
         self._send_common_headers(ctype, len(content))
         self.end_headers()
         self.wfile.write(content)
+        return 200
 
 
 def create_server(

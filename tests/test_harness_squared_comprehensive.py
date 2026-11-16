@@ -64,8 +64,10 @@ class TestHarnessSquaredResearchLab(unittest.TestCase):
     def test_adversarial_evasion_stress_and_fleet_sweep(self) -> None:
         lab = HarnessSquaredResearchLabFacade()
         stress = lab.run_adversarial_evasion_stress()
-        self.assertGreater(stress["baseline_detection_rate_pct"], stress["evasion_resilience_rate_pct"])
-        self.assertGreater(stress["blind_spot_count"], 0)
+        # Wave V Anti-Evasion AST Deobfuscator & Multi-Layer Normalizer closed all 6 prior blind spots
+        self.assertEqual(stress["baseline_detection_rate_pct"], 100.0)
+        self.assertEqual(stress["evasion_resilience_rate_pct"], 100.0)
+        self.assertEqual(stress["blind_spot_count"], 0)
 
         fleet = lab.run_fleet_sweep(
             [

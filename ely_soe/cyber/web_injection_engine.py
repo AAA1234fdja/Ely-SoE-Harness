@@ -28,6 +28,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Pattern, Tuple
 
 from ely_soe.core.models import Severity, new_id
+from ely_soe.cyber.deobfuscation_ast_normalizer import (
+    MultiLayerPayloadNormalizer,
+    PythonASTDeobfuscationEngine,
+)
 from ely_soe.cyber.models import (
     CVSSv4Metrics,
     CyberDomain,
@@ -537,9 +541,11 @@ class WebInjectionSecurityEngine:
             for r in INJECTION_STATIC_RULES
         ]
         self._ast_analyzer = PythonInjectionASTAnalyzer()
+        self._deobf_ast = PythonASTDeobfuscationEngine()
+        self._payload_normalizer = MultiLayerPayloadNormalizer()
 
     def scan_directory(self, root_path: Path) -> List[CyberVulnerability]:
-        """Scan an authorized local codebase snapshot for all injection vulnerability classes."""
+        """Scan an authorized local codebase snapshot for all injection vulnerability classes (including deobfuscated AST sinks)."""
         findings: List[CyberVulnerability] = []
         seen_fps: set[str] = set()
 
@@ -564,6 +570,14 @@ class WebInjectionSecurityEngine:
                 content = file_path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
+
+            if ext == ".py":
+                deobf_res = self._deobf_ast.analyze_source(content, file_path=rel)
+                for df in deobf_res.get("vulnerabilities", []):
+                    fp = df.fingerprint()
+                    if fp not in seen_fps:
+                        seen_fps.add(fp)
+                        findings.append(df)
 
             lines = content.splitlines()
             for rule, regex, anti in self._compiled_rules:

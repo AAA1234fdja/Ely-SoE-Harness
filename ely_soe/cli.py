@@ -397,6 +397,37 @@ def _cmd_cyber(args: argparse.Namespace) -> int:
         print(json.dumps({"hunt": hunt.hunt_log_stream(mal + ben), "quality": hunt.evaluate_detection_quality(mal, ben)}, indent=2))
         return 0
 
+    if action == "autopatch":
+        res = facade.run_verified_autopatch(args.target)
+        print(json.dumps(res, indent=2, default=str))
+        return 0 if res.get("all_patches_syntax_verified", True) else 2
+
+    if action == "dast":
+        res = facade.run_live_dast_scan(args.url)
+        print(json.dumps(res, indent=2, default=str))
+        return 0 if res.get("vulnerabilities_found", 0) == 0 else 2
+
+    if action == "llm-firewall":
+        res = facade.run_llm_firewall_eval(
+            prompt_text=getattr(args, "prompt", None),
+            source_channel=getattr(args, "channel", "user_prompt"),
+        )
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "forensic-bundle":
+        bundle = facade.build_signed_forensic_bundle(args.target)
+        if getattr(args, "html_out", None):
+            Path(args.html_out).write_text(bundle["executive_html_full"], encoding="utf-8")
+        compact = {k: v for k, v in bundle.items() if k != "executive_html_full"}
+        print(json.dumps(compact, indent=2, default=str))
+        return 0 if bundle.get("signature_verified") else 2
+
+    if action == "dfir":
+        res = facade.correlate_dfir_timeline(incident_id=getattr(args, "incident_id", "INC-ELY-DFIR-CLI"))
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
     return 1
 
 
@@ -459,6 +490,36 @@ def _cmd_h2(args: argparse.Namespace) -> int:
 
     if action == "fleet":
         res = lab.run_fleet_sweep(force_profile=args.profile)
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "portfolio":
+        res = lab.run_systemic_defense_portfolio(args.target, budget_usd=float(args.budget))
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "counterfactual":
+        res = lab.run_counterfactual_remediation_plan(args.target, target_posture=float(args.target_posture))
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "diagnostics":
+        res = lab.run_self_diagnostics()
+        print(json.dumps(res, indent=2, default=str))
+        return 0 if res.get("harness_health_verdict") == "HEALTHY_CALIBRATED" else 2
+
+    if action == "guardrails":
+        res = lab.synthesize_permanent_guardrails(args.target, max_rules=int(args.max_rules))
+        print(json.dumps(res, indent=2, default=str))
+        return 0
+
+    if action == "monotonicity":
+        res = lab.prove_version_monotonicity(args.baseline, args.candidate)
+        print(json.dumps(res, indent=2, default=str))
+        return 0 if res.get("ratchet_gate_passed") else 2
+
+    if action == "pareto-parallel":
+        res = lab.run_pareto_parallel_schedule(args.target, sla_budget_ms=int(args.sla_ms), max_stages=int(args.max_stages))
         print(json.dumps(res, indent=2, default=str))
         return 0
 
@@ -619,14 +680,36 @@ def build_parser() -> argparse.ArgumentParser:
     c_sig = cyb_sub.add_parser("sigma-hunt", help="Run Sigma boolean detection & quality benchmark")
     c_sig.add_argument("--json", action="store_true")
     c_sig.set_defaults(func=_cmd_cyber)
+    c_ap = cyb_sub.add_parser("autopatch", help="Run deterministic unified-diff AutoPatch + isolated sandbox differential verifier")
+    c_ap.add_argument("target")
+    c_ap.add_argument("--json", action="store_true")
+    c_ap.set_defaults(func=_cmd_cyber)
+    c_dast = cyb_sub.add_parser("dast", help="Run active loopback HTTP DAST security prober")
+    c_dast.add_argument("url")
+    c_dast.add_argument("--json", action="store_true")
+    c_dast.set_defaults(func=_cmd_cyber)
+    c_llm = cyb_sub.add_parser("llm-firewall", help="Run AI/LLM Prompt-Injection & MCP Tool-Call Firewall battery")
+    c_llm.add_argument("--prompt", default=None)
+    c_llm.add_argument("--channel", default="user_prompt")
+    c_llm.add_argument("--json", action="store_true")
+    c_llm.set_defaults(func=_cmd_cyber)
+    c_fb = cyb_sub.add_parser("forensic-bundle", help="Build HMAC-SHA256 + Merkle signed forensic bundle with CycloneDX 1.5 SBOM & HTML")
+    c_fb.add_argument("target")
+    c_fb.add_argument("--html-out", default=None)
+    c_fb.add_argument("--json", action="store_true")
+    c_fb.set_defaults(func=_cmd_cyber)
+    c_dfir = cyb_sub.add_parser("dfir", help="Correlate multi-source DFIR incident timeline with Merkle chain-of-custody")
+    c_dfir.add_argument("--incident-id", default="INC-ELY-DFIR-CLI")
+    c_dfir.add_argument("--json", action="store_true")
+    c_dfir.set_defaults(func=_cmd_cyber)
 
     # h2 / harness2 (Harness² Second-Order Meta-Control Lab)
-    p_h2 = sub.add_parser("h2", aliases=["harness2"], help="Run Harness² Second-Order Meta-Control Lab (27 subsystems)")
+    p_h2 = sub.add_parser("h2", aliases=["harness2"], help="Run Harness² Second-Order Meta-Control Lab (36 subsystems)")
     h2_sub = p_h2.add_subparsers(dest="h2_action", required=True)
-    h2_cat = h2_sub.add_parser("catalog", help="List all 27 Harness² meta-subsystems & 34 stages")
+    h2_cat = h2_sub.add_parser("catalog", help="List all 36 Harness² meta-subsystems & 45 stages")
     h2_cat.add_argument("--json", action="store_true")
     h2_cat.set_defaults(func=_cmd_h2)
-    h2_st = h2_sub.add_parser("study", help="Run complete Harness² Meta-Study (M1-M8 + Shapley + ADTree + Root-Cause + SARIF)")
+    h2_st = h2_sub.add_parser("study", help="Run complete Harness² Meta-Study (M1-M8 + Shapley + Systemic Portfolio + Counterfactual + SARIF)")
     h2_st.add_argument("target", help="Target directory path")
     h2_st.add_argument("--profile", default="fast_ci")
     h2_st.add_argument("--evolve-pareto", action="store_true")
@@ -650,6 +733,35 @@ def build_parser() -> argparse.ArgumentParser:
     h2_fl.add_argument("--profile", default="fast_ci")
     h2_fl.add_argument("--json", action="store_true")
     h2_fl.set_defaults(func=_cmd_h2)
+    h2_pf = h2_sub.add_parser("portfolio", help="Run Systemic Multi-Threat Defense Portfolio Optimizer (Poisson + 0-1 Knapsack + Monte Carlo CI90)")
+    h2_pf.add_argument("target")
+    h2_pf.add_argument("--budget", type=float, default=50000.0)
+    h2_pf.add_argument("--json", action="store_true")
+    h2_pf.set_defaults(func=_cmd_h2)
+    h2_cf = h2_sub.add_parser("counterfactual", help="Compute Counterfactual Minimum-Edit Remediation PR Plan to PASS")
+    h2_cf.add_argument("target")
+    h2_cf.add_argument("--target-posture", type=float, default=80.0)
+    h2_cf.add_argument("--json", action="store_true")
+    h2_cf.set_defaults(func=_cmd_h2)
+    h2_dg = h2_sub.add_parser("diagnostics", help="Run 6-Canary Precision/Recall/F1 Harness Self-Diagnostics Suite")
+    h2_dg.add_argument("--json", action="store_true")
+    h2_dg.set_defaults(func=_cmd_h2)
+    h2_gr = h2_sub.add_parser("guardrails", help="Synthesize Semgrep, Sigma, YARA, ModSecurity WAF & Regression Unittest Guardrails")
+    h2_gr.add_argument("target")
+    h2_gr.add_argument("--max-rules", type=int, default=8)
+    h2_gr.add_argument("--json", action="store_true")
+    h2_gr.set_defaults(func=_cmd_h2)
+    h2_mn = h2_sub.add_parser("monotonicity", help="Prove Formal Pareto Hardening Monotonicity between baseline and candidate revisions")
+    h2_mn.add_argument("baseline")
+    h2_mn.add_argument("candidate")
+    h2_mn.add_argument("--json", action="store_true")
+    h2_mn.set_defaults(func=_cmd_h2)
+    h2_pp = h2_sub.add_parser("pareto-parallel", help="Solve Latency-SLA Pareto Frontier & execute stages live in parallel topological waves")
+    h2_pp.add_argument("target")
+    h2_pp.add_argument("--sla-ms", type=int, default=5000)
+    h2_pp.add_argument("--max-stages", type=int, default=8)
+    h2_pp.add_argument("--json", action="store_true")
+    h2_pp.set_defaults(func=_cmd_h2)
 
     return parser
 

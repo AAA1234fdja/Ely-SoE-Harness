@@ -400,8 +400,8 @@
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Generalized Enterprise Cybersecurity Suite (47 Specialized Engines)</div>
-              <div class="panel-sub">16 Core Domains + Secrets/DLP + CI/CD PPE Graph + Memory Exploitability + EASM + Ransomware + SaaS SSPM + Sigma/YARA + SOAR + FAIR Risk</div>
+              <div class="panel-title">Generalized Enterprise Cybersecurity Suite (65 Specialized Engines)</div>
+              <div class="panel-sub">16 Core Domains + Anti-Evasion AST Deobfuscator + Interprocedural CFG Taint + AST Invariants + Cloud IaC Drift + Container/Seccomp Guard + DFIR Correlator + AutoPatch + Active DAST + AI/MCP Firewall</div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-danger btn-sm" id="btnCyberScanV09">Unified Cyber Scan: v0_9</button>
@@ -411,6 +411,24 @@
           </div>
           <div class="muted" id="cyberScanStatus" style="margin-bottom:8px;"></div>
           <div class="mini-grid" id="cyberCatalogGrid"></div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Wave V Critical Assurance Studio (AutoPatch &middot; Live DAST &middot; AI/MCP Firewall &middot; Forensic Bundle &middot; SQLite History)</div>
+              <div class="panel-sub">Isolated differential auto-patching, live HTTP header/ScopeGuard DAST self-audit, OWASP LLM firewall battery &amp; HMAC+Merkle CycloneDX 1.5 evidence bundles</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-emerald btn-sm" id="btnW5AutoPatch">Run Verified AutoPatch (v0_9)</button>
+              <button class="btn btn-primary btn-sm" id="btnW5DastSelf">Live HTTP DAST Self-Audit</button>
+              <button class="btn btn-primary btn-sm" id="btnW5LlmFw">AI/LLM &amp; MCP Firewall Battery</button>
+              <button class="btn btn-primary btn-sm" id="btnW5Bundle">Signed Forensic Bundle + SBOM</button>
+              <button class="btn btn-danger btn-sm" id="btnW5Dfir">DFIR Timeline &amp; Custody Merkle</button>
+              <button class="btn btn-sm" id="btnW5Telemetry">HTTP Hardening Telemetry &amp; SQLite History</button>
+            </div>
+          </div>
+          <div id="wave5CyberStudioOutput"><div class="muted">Trigger any Wave V assurance module above to execute live verification inside the isolated sandbox.</div></div>
         </div>
 
         <div id="cyberScanOutput" style="margin-top:14px;"></div>
@@ -467,31 +485,37 @@
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Harness&sup2; Second-Order Adaptive Meta-Control Lab (27 Meta-Subsystems &middot; 34 Stages)</div>
-              <div class="panel-sub">LinUCB Bandits + MAPE-K Live DAG Rewiring + Formal M1&ndash;M8 Proof Certificates + Exact Shapley Attribution + ADTree Solver + Root-Cause Blueprints</div>
+              <div class="panel-title">Harness&sup2; Second-Order Adaptive Meta-Control Lab (36 Meta-Subsystems &middot; 45 Stages)</div>
+              <div class="panel-sub">LinUCB Bandits + MAPE-K Live DAG Rewiring + Formal M1&ndash;M8 Proof Certificates + Systemic Defense Portfolio + Parallel Pareto Scheduler + ECE/PR-AUC Calibrator</div>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-              <label style="font-size:12px; color:var(--text-muted);">ADTree Budget ($)</label>
-              <input type="number" id="h2BudgetInput" value="35000" step="5000" style="width:105px;" />
+              <label style="font-size:12px; color:var(--text-muted);">Defense Budget ($)</label>
+              <input type="number" id="h2BudgetInput" value="50000" step="5000" style="width:105px;" />
               <button class="btn btn-danger btn-sm" id="btnH2StudyV09">Full Meta-Study: v0_9</button>
               <button class="btn btn-emerald btn-sm" id="btnH2StudyV10">Full Meta-Study: v1_0 Hardened</button>
             </div>
           </div>
           <div class="muted" id="h2StatusLine" style="margin-bottom:8px;"></div>
-          <div id="h2StudyOutput"><div class="muted">Launch a Full Meta-Study above to run closed-loop MAPE-K adaptation, M1&ndash;M8 formal safety proofs, Shapley causal attribution, ADTree optimal defense planning, architectural root-cause synthesis &amp; SARIF 2.1 export.</div></div>
+          <div id="h2StudyOutput"><div class="muted">Launch a Full Meta-Study above to run closed-loop MAPE-K adaptation, M1&ndash;M8 formal safety proofs, Shapley causal attribution, Systemic Portfolio Optimization, Counterfactual PR planning &amp; SARIF 2.1 export.</div></div>
         </div>
 
         <div class="panel" style="margin-top:14px;">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Harness&sup2; Scientific Benchmarks, Red-Teaming &amp; Fleet Orchestration</div>
-              <div class="panel-sub">Empirically verify adaptive lift, multi-tier curriculum recall, adversarial evasion resilience, and multi-repo fleet scheduling</div>
+              <div class="panel-title">Harness&sup2; Scientific Benchmarks, Anti-Evasion Red-Teaming &amp; Wave V Optimizers</div>
+              <div class="panel-sub">Verify adaptive lift, 100% anti-evasion resilience, systemic defense portfolio ROI, counterfactual remediation roadmaps, canary calibration &amp; Pareto hardening monotonicity</div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-primary btn-sm" id="btnH2ExpAB">1. Static vs Adaptive A/B Lift</button>
               <button class="btn btn-primary btn-sm" id="btnH2ExpCurr">2. 5-Tier Curriculum + Hypervolume</button>
-              <button class="btn btn-danger btn-sm" id="btnH2ExpStress">3. Adversarial Evasion Stress-Test</button>
+              <button class="btn btn-danger btn-sm" id="btnH2ExpStress">3. Adversarial Evasion Stress (100%)</button>
               <button class="btn btn-emerald btn-sm" id="btnH2ExpFleet">4. Multi-Repo Fleet Sweep</button>
+              <button class="btn btn-emerald btn-sm" id="btnH2ExpPortfolio">5. Systemic Defense Portfolio</button>
+              <button class="btn btn-primary btn-sm" id="btnH2ExpCounterfactual">6. Counterfactual Min-Edit Plan</button>
+              <button class="btn btn-emerald btn-sm" id="btnH2ExpDiagnostics">7. 6-Canary Self-Diagnostics</button>
+              <button class="btn btn-primary btn-sm" id="btnH2ExpGuardrails">8. Synthesize Semgrep/Sigma/WAF</button>
+              <button class="btn btn-emerald btn-sm" id="btnH2ExpMonotonicity">9. Hardening Monotonicity Proof</button>
+              <button class="btn btn-primary btn-sm" id="btnH2ExpPareto">10. Parallel Pareto Wave Scheduler</button>
             </div>
           </div>
           <div id="h2ExperimentsOutput"><div class="muted">Select any Harness&sup2; empirical experiment above to run live inside the sandbox.</div></div>
@@ -499,7 +523,7 @@
 
         <div class="panel" style="margin-top:14px;">
           <div class="panel-header">
-            <div class="panel-title">Harness&sup2; Architecture: 27 Second-Order Meta-Control Subsystems</div>
+            <div class="panel-title">Harness&sup2; Architecture: 36 Second-Order Meta-Control Subsystems</div>
           </div>
           <div class="mini-grid" id="h2SubsystemsGrid"></div>
         </div>

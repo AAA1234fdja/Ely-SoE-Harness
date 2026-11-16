@@ -15,8 +15,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ely_soe.analyzers.ast_symbolic_dataflow_prover import ASTSymbolicDataflowProver
+from ely_soe.analyzers.interprocedural_cfg_taint_engine import InterproceduralCFGTaintEngine
+from ely_soe.analyzers.polyglot_js_ts_go_ast_scanner import PolyglotSourceSecurityScanner
+from ely_soe.analyzers.semantic_reachability_verifier import SemanticReachabilityVerifier
 from ely_soe.core.models import Severity, new_id, utc_now_iso
+from ely_soe.cyber.ai_llm_agent_security_firewall import AILLMAgentSecurityFirewall
 from ely_soe.cyber.ai_llm_redteam_engine import AILLMRedTeamEngine
+from ely_soe.cyber.cloud_iac_drift_policy_engine import CloudIaCPolicyDriftEngine
+from ely_soe.cyber.container_supply_chain_runtime_guard import ContainerSupplyChainRuntimeGuard
+from ely_soe.cyber.deobfuscation_ast_normalizer import PythonASTDeobfuscationEngine
+from ely_soe.cyber.network_tls_protocol_auditor import NetworkTLSZeroTrustAuditor
+from ely_soe.cyber.sbom_cve_exploit_intelligence import SupplyChainScorecardEngine
+from ely_soe.cyber.secret_entropy_context_verifier import ContextualSecretVerifierEngine
 from ely_soe.cyber.api_fuzz_contract_auditor import OpenAPIContractSecurityAuditor
 from ely_soe.cyber.api_microservices_engine import APIMicroservicesSecurityEngine
 from ely_soe.cyber.auth_access_control_engine import AuthAccessControlEngine
@@ -130,6 +141,17 @@ STAGE_CATALOG: Dict[str, RegisteredStageSpec] = {
     "k8s_admission_opa": RegisteredStageSpec("k8s_admission_opa", "Kubernetes OPA/Kyverno PSS-Restricted Admission Gate", StageCategory.INFRA_CLOUD_K8S, 1500, "Validates K8s PodSpecs against PSS restricted & synthesizes Kyverno/Rego."),
     "oauth21_pkce_audit": RegisteredStageSpec("oauth21_pkce_audit", "OAuth 2.1 / OIDC / PKCE State-Machine Fuzzer", StageCategory.AUTH_IDENTITY, 1400, "12 RFC 9700 / PKCE / redirect-URI bypass protocol state-machine checks."),
     "hardware_boot_attest": RegisteredStageSpec("hardware_boot_attest", "UEFI Secure Boot, TPM 2.0 PCR & Silicon RoT Auditor", StageCategory.BINARY_OT, 1500, "Audits UEFI dbx/BootGuard, TPM 2.0 PCR quotes & embedded JTAG/OTA."),
+    "deobfuscation_ast": RegisteredStageSpec("deobfuscation_ast", "Multi-Layer Deobfuscation & Python AST Partial Evaluator", StageCategory.WEB_APPSEC, 1800, "Unwraps Base64/Hex/URL/Unicode/comment evasion and resolves indirect getattr/concat/alias AST sinks."),
+    "interprocedural_taint": RegisteredStageSpec("interprocedural_taint", "Repository-Wide Interprocedural Multi-Hop CFG Taint Engine", StageCategory.WEB_APPSEC, 2000, "Traces cross-function multi-hop taint flows with sanitizer-barrier suppression."),
+    "contextual_secrets": RegisteredStageSpec("contextual_secrets", "Contextual High-Precision Secret & Entropy Verifier", StageCategory.SUPPLY_CHAIN_SECRETS, 1600, "Deobfuscating Shannon-entropy secret scanner with placeholder suppression & rotation runbooks."),
+    "polyglot_scanner": RegisteredStageSpec("polyglot_scanner", "Polyglot JS/TS/Go/Bash/Dockerfile/SQL Security Scanner", StageCategory.WEB_APPSEC, 1700, "Language-specific AST/sink analysis across JavaScript, TypeScript, Go, Bash, Dockerfiles & SQL."),
+    "network_tls_zt": RegisteredStageSpec("network_tls_zt", "Network Perimeter, TLS/SSH & Zero-Trust Segmentation Auditor", StageCategory.NETWORK_CRYPTO, 1500, "Audits weak TLS/ciphers, SSH root/password auth, 0.0.0.0/0 DB ports & Istio mTLS."),
+    "supply_chain_scorecard": RegisteredStageSpec("supply_chain_scorecard", "OpenSSF Scorecard & SLSA Supply-Chain Assurance Engine", StageCategory.SUPPLY_CHAIN_SECRETS, 1600, "Scores dependency pinning, KEV CVEs, lockfile reproducibility & SLSA readiness."),
+    "ai_llm_firewall": RegisteredStageSpec("ai_llm_firewall", "AI/LLM Prompt-Injection & MCP Tool-Call Firewall", StageCategory.AI_REDTEAM, 1500, "Deobfuscating prompt/RAG poisoning guard & CaMeL MCP tool-call argument firewall."),
+    "semantic_reachability": RegisteredStageSpec("semantic_reachability", "AST Entrypoint Reachability & Dead-Code Pruner", StageCategory.SYNTHESIS_COMPLIANCE, 1500, "BFS entrypoint reachability proof, guard-dominance analysis & dead-code FP pruning."),
+    "ast_symbolic_invariants": RegisteredStageSpec("ast_symbolic_invariants", "AST Symbolic Invariant Prover (Timing/TOCTOU/ReDoS/Fail-Open)", StageCategory.WEB_APPSEC, 1600, "Proves CWE-208 timing leaks, CWE-367 TOCTOU races, CWE-1333 ReDoS, CWE-617 assert bypass & fail-open auth."),
+    "cloud_iac_drift_policy": RegisteredStageSpec("cloud_iac_drift_policy", "Cloud IaC Terraform/CFN/IAM Policy & Drift Auditor", StageCategory.INFRA_CLOUD_K8S, 1600, "Audits AWS/GCP/Azure IaC, IAM Confused-Deputy/PassRole escalation & emits hardened HCL snippets."),
+    "container_runtime_guard": RegisteredStageSpec("container_runtime_guard", "Container Supply-Chain, Compose & OCI Seccomp Guard", StageCategory.INFRA_CLOUD_K8S, 1500, "Audits Dockerfiles, docker-compose escape surfaces & OCI seccomp.json profiles."),
 }
 
 
@@ -160,6 +182,17 @@ class FirstOrderStageRegistry:
         self.k8s_admission = KubernetesAdmissionPolicyEngine()
         self.oauth21_auditor = OAuth21PKCEStateMachineAuditor()
         self.hw_boot_auditor = HardwareFirmwareBootAuditor()
+        self.deobf_ast = PythonASTDeobfuscationEngine()
+        self.ip_taint = InterproceduralCFGTaintEngine()
+        self.ctx_secrets = ContextualSecretVerifierEngine()
+        self.polyglot = PolyglotSourceSecurityScanner()
+        self.net_tls_zt = NetworkTLSZeroTrustAuditor()
+        self.sc_scorecard = SupplyChainScorecardEngine()
+        self.ai_firewall = AILLMAgentSecurityFirewall()
+        self.reachability = SemanticReachabilityVerifier()
+        self.ast_invariants = ASTSymbolicDataflowProver()
+        self.iac_drift = CloudIaCPolicyDriftEngine()
+        self.container_guard = ContainerSupplyChainRuntimeGuard()
         self.binary = BinaryAndMemorySafetyEngine()
         self.iot_ot = FirmwareIoTOTSecurityEngine()
         self.cloud_iam = CloudIAMSecurityEngine()
@@ -501,8 +534,122 @@ class FirstOrderStageRegistry:
                     "root_of_trust_score_pct": rep["root_of_trust_score_pct"],
                 }
             }, {}
+        if name == "deobfuscation_ast":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.deobf_ast.scan_directory(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "deobfuscation_ast": {
+                    "python_files_scanned": rep.get("python_files_scanned", 0),
+                    "deobfuscated_sinks_found": rep.get("total_deobfuscated_sinks", len(rep.get("vulnerabilities", []))),
+                }
+            }, {}
+        if name == "interprocedural_taint":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.ip_taint.analyze_directory(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "interprocedural_taint": {
+                    "functions_indexed": rep.get("functions_indexed", 0),
+                    "call_graph_edges": rep.get("call_graph_edges", 0),
+                    "total_taint_flows": rep.get("total_taint_flows", 0),
+                    "multihop_flows": rep.get("multihop_interprocedural_flows", 0),
+                }
+            }, {}
+        if name == "contextual_secrets":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.ctx_secrets.scan_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "contextual_secrets": {
+                    "confirmed_secrets": rep.get("confirmed_secrets_count", 0),
+                    "suppressed_false_positives": rep.get("suppressed_false_positives_count", 0),
+                }
+            }, {}
+        if name == "polyglot_scanner":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.polyglot.scan_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "polyglot_scanner": {
+                    "files_scanned": rep.get("files_scanned", 0),
+                    "languages_audited": rep.get("languages_audited", {}),
+                }
+            }, {}
+        if name == "network_tls_zt":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.net_tls_zt.audit_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "network_tls_zt": {
+                    "zero_trust_network_index": rep.get("zero_trust_network_index", 100.0),
+                    "findings_count": rep.get("findings_count", 0),
+                }
+            }, {}
+        if name == "supply_chain_scorecard":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.sc_scorecard.audit_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "supply_chain_scorecard": {
+                    "openssf_scorecard_10": rep.get("openssf_scorecard_10", 10.0),
+                    "slsa_readiness_level": rep.get("slsa_readiness_level", "SLSA-1"),
+                }
+            }, {}
+        if name == "ai_llm_firewall":
+            rep = self.ai_firewall.run_owasp_llm_redteam_battery()
+            return [], {
+                "ai_llm_firewall": {
+                    "owasp_llm_firewall_score_pct": rep["owasp_llm_firewall_score_pct"],
+                    "attack_block_rate_pct": rep["attack_block_rate_pct"],
+                    "benign_allow_rate_pct": rep["benign_allow_rate_pct"],
+                }
+            }, {}
+        if name == "semantic_reachability":
+            if not has_dir:
+                return [], {}, {}
+            idx = self.reachability.index_repository(path)
+            ver = self.reachability.verify_findings(ctx.accumulated_vulns)
+            return [], {
+                "semantic_reachability": {
+                    "entrypoints_discovered": idx["entrypoints_discovered"],
+                    "dead_code_lines_detected": idx["dead_code_lines_detected"],
+                    "proven_reachable_unprotected": ver["proven_reachable_unprotected"],
+                    "estimated_fp_reduction_pct": ver["estimated_false_positive_reduction_pct"],
+                }
+            }, {}
+        if name == "ast_symbolic_invariants":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.ast_invariants.analyze_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "ast_symbolic_invariants": {
+                    "python_files_scanned": rep.get("python_files_scanned", 0),
+                    "invariant_stats": rep.get("invariant_stats", {}),
+                }
+            }, {}
+        if name == "cloud_iac_drift_policy":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.iac_drift.audit_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "cloud_iac_drift_policy": {
+                    "iac_files_scanned": rep.get("iac_files_scanned", 0),
+                    "iac_security_score": rep.get("iac_security_score", 100.0),
+                }
+            }, {}
+        if name == "container_runtime_guard":
+            if not has_dir:
+                return [], {}, {}
+            rep = self.container_guard.audit_repository(path)
+            return list(rep.get("vulnerabilities", [])), {
+                "container_runtime_guard": {
+                    "artifacts_audited": rep.get("artifacts_audited", {}),
+                    "container_security_score": rep.get("container_security_score", 100.0),
+                }
+            }, {}
 
-        raise KeyError(f"Unknown Harness² stage adapter: '{adapter_name}'")
+        raise KeyError(f"Unknown Harness² stage adapter: '{name}'")
 
     def _run_live_probes(self, base_url: str) -> List[CyberVulnerability]:
         handler = build_local_http_probe_handler(base_url)

@@ -30,27 +30,36 @@ from typing import Any, Dict, List, Optional, Sequence
 from ely_soe.core.models import Severity, utc_now_iso
 from ely_soe.core.scope_guard import ScopeGuard
 from ely_soe.cyber.adversarial_ml_security import AdversarialMLSecurityEngine
+from ely_soe.cyber.ai_llm_agent_security_firewall import AILLMAgentSecurityFirewall
 from ely_soe.cyber.ai_llm_redteam_engine import AILLMRedTeamEngine
 from ely_soe.cyber.api_fuzz_contract_auditor import OpenAPIContractSecurityAuditor
 from ely_soe.cyber.attack_surface_asm_engine import ExternalAssetRecord, ExternalAttackSurfaceEngine
 from ely_soe.cyber.browser_dom_csp_engine import BrowserDOMCSPEngine
 from ely_soe.cyber.chaos_resilience_tester import SecurityChaosResilienceTester
 from ely_soe.cyber.cicd_pipeline_graph_auditor import CICDPipelineGraphAuditor
+from ely_soe.cyber.cloud_iac_drift_policy_engine import CloudIaCPolicyDriftEngine
 from ely_soe.cyber.cloud_posture_cspm import MultiCloudCSPMEngine
+from ely_soe.cyber.compliance_evidence_mapper_v2 import RegulatoryComplianceEvidenceMapperV2
 from ely_soe.cyber.compliance_mapper import EnterpriseComplianceMapper
+from ely_soe.cyber.container_supply_chain_runtime_guard import ContainerSupplyChainRuntimeGuard
 from ely_soe.cyber.crypto_protocol_verifier import CryptoProtocolVerifier
 from ely_soe.cyber.cwe_knowledge_base import CWEKnowledgeBase
 from ely_soe.cyber.database_security_auditor import DatabaseSecurityAuditor
+from ely_soe.cyber.deobfuscation_ast_normalizer import PythonASTDeobfuscationEngine
 from ely_soe.cyber.devsecops_artifact_verifier import DevSecOpsArtifactVerifier
 from ely_soe.cyber.dns_bgp_email_auth_auditor import DNSBGPEmailAuthAuditor
 from ely_soe.cyber.ebpf_kernel_audit_engine import KernelAndSeccompAuditEngine
+from ely_soe.cyber.exploit_chain_graph_engine import ExploitChainGraphEngine
+from ely_soe.cyber.finding_deduplicator_correlator import CrossEngineFindingCorrelator
 from ely_soe.cyber.forensics_ir_engine import DigitalForensicsIREngine
 from ely_soe.cyber.graphql_grpc_websocket_engine import GraphQLGRPCWebSocketAuditor
 from ely_soe.cyber.identity_federation_saml_oidc_auditor import IdentityFederationAuditor
+from ely_soe.cyber.incident_timeline_forensic_correlator import IncidentTimelineForensicCorrelator
 from ely_soe.cyber.memory_corruption_exploit_modeler import MemoryCorruptionExploitModeler
 from ely_soe.cyber.mobile_client_security import MobileAndClientSecurityAuditor
 from ely_soe.cyber.models import AssetCriticality, CyberVulnerability
 from ely_soe.cyber.network_pcap_packet_analyzer import NetworkPCAPPacketAnalyzer
+from ely_soe.cyber.network_tls_protocol_auditor import NetworkTLSZeroTrustAuditor
 from ely_soe.cyber.orchestrator import GeneralizedCyberOrchestrator
 from ely_soe.cyber.ot_ics_scada_auditor import OTICSSCADAAuditor
 from ely_soe.cyber.pentest_report_generator import CyberPentestReportGenerator
@@ -69,7 +78,10 @@ from ely_soe.cyber.ransomware_resilience_simulator import (
 )
 from ely_soe.cyber.redteam_campaigns import BreachAndAttackCampaignEngine
 from ely_soe.cyber.reverse_engineering_disasm_lite import ReverseEngineeringTriageEngine
+from ely_soe.cyber.runtime_dast_security_scanner import RuntimeDASTSecurityScanner
 from ely_soe.cyber.saas_workspace_cspm_engine import SaaSWorkspaceSSPMEngine
+from ely_soe.cyber.sbom_cve_exploit_intelligence import SupplyChainScorecardEngine
+from ely_soe.cyber.secret_entropy_context_verifier import ContextualSecretVerifierEngine
 from ely_soe.cyber.secrets_dlp_engine import SecretsAndDLPEngine
 from ely_soe.cyber.serverless_mesh_auditor import ServerlessAndMeshSecurityAuditor
 from ely_soe.cyber.smart_contract_web3_auditor import SmartContractWeb3Auditor
@@ -81,6 +93,8 @@ from ely_soe.cyber.threat_intel_stix_engine import ThreatIntelSTIXEngine
 from ely_soe.cyber.waf_ids_rule_synthesizer import WAFIDSRuleSynthesizer
 from ely_soe.cyber.windows_endpoint_edr_engine import WindowsEndpointEDREngine
 from ely_soe.cyber.zero_trust_identity_engine import ZeroTrustIdentityEngine
+from ely_soe.harness.forensic_evidence_bundler import ForensicEvidenceBundler
+from ely_soe.harness.verified_autopatch_engine import VerifiedAutoPatchEngine
 
 
 CYBER_ENGINE_CATALOG: List[Dict[str, str]] = [
@@ -131,11 +145,29 @@ CYBER_ENGINE_CATALOG: List[Dict[str, str]] = [
     {"id": "crypto_oracle_lab", "category": "Cryptography", "name": "CryptographicOracleVerificationLab", "scope": "AES nonce-reuse XOR, RSA e=3 cube-root, DudeCT Welch timing, Padding Oracle & LCG PRNG"},
     {"id": "zeroday_vex_triage", "category": "Supply Chain", "name": "ZeroDayPatchTriageEngine", "scope": "CVE sink reachability triage, CycloneDX 1.5 VEX generator & ModSec/Nginx virtual patches"},
     {"id": "oauth21_pkce_fuzzer", "category": "Identity & Zero Trust", "name": "OAuth21PKCEStateMachineAuditor", "scope": "12 RFC 9700 / OAuth 2.1 / PKCE / OIDC protocol state-machine & redirect-URI fuzz checks"},
+    {"id": "deobfuscation_ast", "category": "AppSec & Anti-Evasion", "name": "PythonASTDeobfuscationEngine", "scope": "Multi-layer Base64/Hex/URL/Unicode/comment peeling + AST partial evaluation & split-secret folding"},
+    {"id": "interprocedural_taint", "category": "AppSec & Anti-Evasion", "name": "InterproceduralCFGTaintEngine", "scope": "Repository-wide multi-hop call-graph taint tracing with verified domain sanitizer barriers"},
+    {"id": "cross_engine_correlator", "category": "AppSec & Anti-Evasion", "name": "CrossEngineFindingCorrelator", "scope": "Semantic multi-engine clustering + Bayesian noisy-OR confidence corroboration"},
+    {"id": "semantic_reachability", "category": "AppSec & Anti-Evasion", "name": "SemanticReachabilityVerifier", "scope": "AST entrypoint BFS reachability proof, dominating auth-guard detection & dead-code FP pruning"},
+    {"id": "contextual_secret_verifier", "category": "AppSec & Data", "name": "ContextualSecretVerifierEngine", "scope": "Shannon-entropy + deobfuscating provider grammar secret verifier with redaction & rotation runbooks"},
+    {"id": "polyglot_source_scanner", "category": "AppSec & Anti-Evasion", "name": "PolyglotSourceSecurityScanner", "scope": "Multi-language JS/TS/Go/Bash/Dockerfile/SQL AST-aware sink & security scanner"},
+    {"id": "runtime_dast_scanner", "category": "Web & Runtime DAST", "name": "RuntimeDASTSecurityScanner", "scope": "Authorized loopback active HTTP DAST (CSP/CORS/TRACE/Traversal/ScopeGuard/Reflected-XSS)"},
+    {"id": "network_tls_zerotrust", "category": "Network & Edge", "name": "NetworkTLSZeroTrustAuditor", "scope": "TLS/cipher suite, SSH daemon, 0.0.0.0/0 DB port & Istio mTLS Zero-Trust auditor"},
+    {"id": "supply_chain_scorecard", "category": "Supply Chain", "name": "SupplyChainScorecardEngine", "scope": "OpenSSF Scorecard offline heuristics, KEV CVE correlation & SLSA Level 0-3 readiness"},
+    {"id": "ai_llm_mcp_firewall", "category": "AI Security", "name": "AILLMAgentSecurityFirewall", "scope": "Deobfuscating prompt/RAG poisoning firewall + CaMeL MCP tool-call argument policy guard"},
+    {"id": "exploit_chain_chokepoint", "category": "Threat Intel & Risk", "name": "ExploitChainGraphEngine", "scope": "MITRE Kill-Chain hypergraph synthesizer & Minimum Vertex-Cut Chokepoint solver"},
+    {"id": "verified_autopatch", "category": "Autonomous Remediation", "name": "VerifiedAutoPatchEngine", "scope": "14-rule deterministic unified-diff patcher + isolated temp-sandbox syntax & differential verification"},
+    {"id": "forensic_evidence_bundler", "category": "Governance & Reporting", "name": "ForensicEvidenceBundler", "scope": "HMAC-SHA256 + Merkle signed evidence bundles, CycloneDX v1.5 SBOM & executive HTML reports"},
+    {"id": "compliance_evidence_v2", "category": "Governance & Reporting", "name": "RegulatoryComplianceEvidenceMapperV2", "scope": "Evidence-linked NIST CSF 2.0, OWASP ASVS 4.0.3, SOC 2, ISO 27001, PCI-DSS 4.0 & EU AI Act"},
+    {"id": "ast_symbolic_invariants", "category": "AppSec & Anti-Evasion", "name": "ASTSymbolicDataflowProver", "scope": "Timing oracle (CWE-208), TOCTOU race (CWE-367), ReDoS prover (CWE-1333), assert-bypass & fail-open"},
+    {"id": "cloud_iac_drift", "category": "Cloud & K8s", "name": "CloudIaCPolicyDriftEngine", "scope": "Terraform/CFN/IAM Confused-Deputy & PassRole auditor, hardened HCL snippets & drift gate"},
+    {"id": "container_runtime_guard", "category": "Cloud & K8s", "name": "ContainerSupplyChainRuntimeGuard", "scope": "Dockerfile supply-chain, Docker Compose escape surface & OCI Seccomp profile verifier/synthesizer"},
+    {"id": "dfir_timeline_correlator", "category": "Endpoint & DFIR", "name": "IncidentTimelineForensicCorrelator", "scope": "Multi-source DFIR timeline reconstructor, lateral pivot chain, IOCs & Merkle chain-of-custody"},
 ]
 
 
 class EnterpriseCyberSuiteFacade:
-    """Single-entry facade unifying all 40+ specialized `ely_soe.cyber` engines."""
+    """Single-entry facade unifying all 61 specialized `ely_soe.cyber` & Wave V engines."""
 
     def __init__(self, scope_guard: Optional[ScopeGuard] = None) -> None:
         self.scope_guard = scope_guard
@@ -163,6 +195,30 @@ class EnterpriseCyberSuiteFacade:
         self.campaigns = BreachAndAttackCampaignEngine()
         self.cwe_kb = CWEKnowledgeBase()
         self.report_gen = CyberPentestReportGenerator()
+        # Wave V Critical Engines (import cross-package analyzers lazily to prevent import cycles)
+        from ely_soe.analyzers.ast_symbolic_dataflow_prover import ASTSymbolicDataflowProver
+        from ely_soe.analyzers.interprocedural_cfg_taint_engine import InterproceduralCFGTaintEngine
+        from ely_soe.analyzers.polyglot_js_ts_go_ast_scanner import PolyglotSourceSecurityScanner
+        from ely_soe.analyzers.semantic_reachability_verifier import SemanticReachabilityVerifier
+
+        self.deobf_ast = PythonASTDeobfuscationEngine()
+        self.ip_taint = InterproceduralCFGTaintEngine()
+        self.correlator = CrossEngineFindingCorrelator()
+        self.reachability = SemanticReachabilityVerifier()
+        self.ctx_secrets = ContextualSecretVerifierEngine()
+        self.polyglot = PolyglotSourceSecurityScanner()
+        self.dast_scanner = RuntimeDASTSecurityScanner()
+        self.network_tls = NetworkTLSZeroTrustAuditor()
+        self.sc_scorecard = SupplyChainScorecardEngine()
+        self.ai_firewall = AILLMAgentSecurityFirewall()
+        self.exploit_graph = ExploitChainGraphEngine()
+        self.autopatch = VerifiedAutoPatchEngine()
+        self.forensic_bundler = ForensicEvidenceBundler()
+        self.compliance_v2 = RegulatoryComplianceEvidenceMapperV2()
+        self.ast_invariants = ASTSymbolicDataflowProver()
+        self.cloud_iac_drift = CloudIaCPolicyDriftEngine()
+        self.container_guard = ContainerSupplyChainRuntimeGuard()
+        self.dfir_correlator = IncidentTimelineForensicCorrelator()
 
     def catalog_engines(self) -> Dict[str, Any]:
         categories: Dict[str, int] = {}
@@ -231,7 +287,47 @@ class EnterpriseCyberSuiteFacade:
             extended_vulns.extend(ai_vulns)
             extended_telemetry["ai_llm_static_findings"] = len(ai_vulns)
 
-        # Normalize & deduplicate merged findings
+            # Wave V Deep Anti-Evasion, Interprocedural Taint, Polyglot, Network/TLS & Supply-Chain Scorecard
+            deobf_res = self.deobf_ast.scan_directory(p)
+            extended_vulns.extend(deobf_res.get("vulnerabilities", []))
+            extended_telemetry["deobfuscation_ast_sinks"] = len(deobf_res.get("vulnerabilities", []))
+
+            taint_res = self.ip_taint.analyze_directory(p)
+            extended_vulns.extend(taint_res.get("vulnerabilities", []))
+            extended_telemetry["interprocedural_taint_flows"] = taint_res.get("total_taint_flows", 0)
+            extended_telemetry["interprocedural_multihop_flows"] = taint_res.get("multihop_interprocedural_flows", 0)
+
+            ctx_sec_res = self.ctx_secrets.scan_repository(p)
+            extended_vulns.extend(ctx_sec_res.get("vulnerabilities", []))
+            extended_telemetry["contextual_verified_secrets"] = ctx_sec_res.get("confirmed_secrets_count", 0)
+            extended_telemetry["secret_false_positives_suppressed"] = ctx_sec_res.get("suppressed_false_positives_count", 0)
+
+            poly_res = self.polyglot.scan_repository(p)
+            extended_vulns.extend(poly_res.get("vulnerabilities", []))
+            extended_telemetry["polyglot_findings"] = poly_res.get("findings_count", 0)
+
+            net_res = self.network_tls.audit_repository(p)
+            extended_vulns.extend(net_res.get("vulnerabilities", []))
+            extended_telemetry["zero_trust_network_index"] = net_res.get("zero_trust_network_index", 100.0)
+
+            sc_res = self.sc_scorecard.audit_repository(p)
+            extended_vulns.extend(sc_res.get("vulnerabilities", []))
+            extended_telemetry["openssf_scorecard_10"] = sc_res.get("openssf_scorecard_10", 10.0)
+            extended_telemetry["slsa_readiness_level"] = sc_res.get("slsa_readiness_level", "SLSA-1")
+
+            inv_res = self.ast_invariants.analyze_repository(p)
+            extended_vulns.extend(inv_res.get("vulnerabilities", []))
+            extended_telemetry["ast_symbolic_invariant_findings"] = inv_res.get("findings_count", 0)
+
+            iac_res = self.cloud_iac_drift.audit_repository(p)
+            extended_vulns.extend(iac_res.get("vulnerabilities", []))
+            extended_telemetry["cloud_iac_security_score"] = iac_res.get("iac_security_score", 100.0)
+
+            ctr_res = self.container_guard.audit_repository(p)
+            extended_vulns.extend(ctr_res.get("vulnerabilities", []))
+            extended_telemetry["container_runtime_security_score"] = ctr_res.get("container_security_score", 100.0)
+
+        # Normalize, deduplicate & Bayesian-corroborate merged findings
         seen_fp = set()
         merged_dicts: List[Dict[str, Any]] = []
         merged_objs: List[CyberVulnerability] = []
@@ -255,6 +351,39 @@ class EnterpriseCyberSuiteFacade:
                 seen_fp.add(fp)
                 merged_objs.append(ev)
                 merged_dicts.append(ev.to_dict())
+
+        # Cross-Engine Semantic Deduplication & Bayesian Noisy-OR Confidence Corroboration
+        corr_summary: Dict[str, Any] = {}
+        if merged_objs:
+            corr_res = self.correlator.deduplicate_and_correlate(merged_objs)
+            dedup_objs = corr_res.get("deduplicated_vulnerabilities", merged_objs)
+            corr_summary = {
+                "raw_findings_count": corr_res.get("raw_findings_count", len(merged_objs)),
+                "deduplicated_findings_count": corr_res.get("deduplicated_findings_count", len(dedup_objs)),
+                "duplicates_eliminated": corr_res.get("duplicates_eliminated", 0),
+                "noise_reduction_pct": corr_res.get("noise_reduction_pct", 0.0),
+                "multi_engine_corroborated_count": corr_res.get("multi_engine_corroborated_count", 0),
+            }
+            merged_objs = list(dedup_objs)
+            merged_dicts = [v.to_dict() for v in merged_objs]
+
+        # Semantic AST Reachability & Dead-Code Verification
+        reachability_summary: Dict[str, Any] = {}
+        if p.exists() and p.is_dir():
+            idx_rep = self.reachability.index_repository(p)
+            ver_rep = self.reachability.verify_findings(merged_dicts)
+            reachability_summary = {
+                "entrypoints_discovered": idx_rep["entrypoints_discovered"],
+                "dead_code_lines_detected": idx_rep["dead_code_lines_detected"],
+                "proven_reachable_unprotected": ver_rep["proven_reachable_unprotected"],
+                "guarded_reachable": ver_rep["guarded_reachable"],
+                "dead_or_test_suppression_candidates": ver_rep["dead_or_test_suppression_candidates"],
+                "estimated_fp_reduction_pct": ver_rep["estimated_false_positive_reduction_pct"],
+            }
+
+        # Multi-Stage Exploit-Chain Chokepoint Synthesis
+        chokepoint_graph = self.exploit_graph.synthesize_and_solve_chokepoints(merged_dicts)
+        compliance_v2 = self.compliance_v2.evaluate_compliance(merged_dicts)
 
         comp = self.compliance.evaluate(merged_objs if merged_objs else extended_vulns)
         soar_recs = self.soar.recommend_playbooks_for_findings(merged_dicts)
@@ -282,14 +411,18 @@ class EnterpriseCyberSuiteFacade:
             "overall_cyber_posture": core_dict.get("overall_cyber_posture", 0.0),
             "total_vulnerabilities": len(merged_dicts),
             "core_vulnerabilities": core_cnt,
-            "extended_vulnerabilities_added": len(merged_dicts) - core_cnt,
+            "extended_vulnerabilities_added": max(0, len(merged_dicts) - core_cnt),
             "severity_counts": sev_counts,
             "domain_counts": core_dict.get("domain_counts", {}),
             "domain_scores": core_dict.get("domain_scores", {}),
             "exploit_chains_count": len(chains),
             "exploit_chains": chains,
+            "exploit_chain_chokepoints": chokepoint_graph,
+            "cross_engine_correlation": corr_summary,
+            "semantic_reachability": reachability_summary,
             "compliance_readiness_pct": comp.get("overall_compliance_readiness_pct", 0.0),
             "compliance_frameworks": comp.get("frameworks", {}),
+            "compliance_evidence_v2": compliance_v2,
             "soar_recommended_playbooks": soar_recs,
             "waf_virtual_patches_synthesized": waf_bundle.get("total_rules_synthesized", len(waf_bundle.get("rules", []))),
             "auto_sigma_yaml_samples": sigma_samples,
@@ -424,3 +557,73 @@ class EnterpriseCyberSuiteFacade:
             dry_run=dry_run,
             auto_approve_hitl=auto_approve_hitl,
         )
+
+    def run_verified_autopatch(self, target_path: str) -> Dict[str, Any]:
+        """Synthesize deterministic unified-diff patches & verify in an isolated temp sandbox."""
+        return self.autopatch.run_isolated_differential_autopatch(target_path)
+
+    def run_live_dast_scan(
+        self,
+        base_url: str,
+        *,
+        probe_endpoints: Optional[Sequence[str]] = None,
+        test_post_endpoint: Optional[str] = "/api/cyber/scan",
+    ) -> Dict[str, Any]:
+        """Run active non-destructive HTTP DAST security probing against an authorized local URL."""
+        res = self.dast_scanner.scan_live_target(
+            base_url,
+            probe_endpoints=probe_endpoints,
+            test_post_endpoint=test_post_endpoint,
+        )
+        return {
+            **{k: v for k, v in res.items() if k != "vulnerabilities"},
+            "vulnerabilities": [v.to_dict() for v in res.get("vulnerabilities", [])],
+        }
+
+    def run_llm_firewall_eval(
+        self,
+        *,
+        prompt_text: Optional[str] = None,
+        source_channel: str = "user_prompt",
+        tool_name: Optional[str] = None,
+        tool_arguments: Optional[Dict[str, Any]] = None,
+        caller_trust_level: str = "UNTRUSTED_DATA",
+    ) -> Dict[str, Any]:
+        """Inspect prompts/RAG chunks & MCP tool calls, or run the full 8-case OWASP LLM battery."""
+        out: Dict[str, Any] = {"battery": self.ai_firewall.run_owasp_llm_redteam_battery()}
+        if prompt_text:
+            pr = self.ai_firewall.inspect_prompt_or_rag(prompt_text, source_channel=source_channel)
+            out["prompt_inspection"] = {
+                **{k: v for k, v in pr.items() if k != "vulnerabilities"},
+                "vulnerabilities": [v.to_dict() for v in pr.get("vulnerabilities", [])],
+            }
+        if tool_name:
+            out["mcp_tool_inspection"] = self.ai_firewall.evaluate_mcp_tool_call(
+                tool_name, tool_arguments or {}, caller_trust_level=caller_trust_level
+            )
+        return out
+
+    def build_signed_forensic_bundle(
+        self,
+        target_path: str,
+        scan_summary: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Create an HMAC-SHA256 + Merkle signed forensic bundle with CycloneDX 1.5 SBOM & Executive HTML."""
+        summary = scan_summary or self.run_unified_cyber_scan(target_path, run_sandbox_range=False)
+        return self.forensic_bundler.create_signed_bundle(target_dir=target_path, scan_summary=summary)
+
+    def correlate_dfir_timeline(
+        self,
+        raw_events: Optional[Sequence[Dict[str, Any]]] = None,
+        *,
+        incident_id: str = "INC-ELY-DFIR-001",
+    ) -> Dict[str, Any]:
+        """Reconstruct chronological multi-stage attack timeline with Merkle chain-of-custody."""
+        events = list(raw_events) if raw_events else [
+            {"timestamp": "2026-11-15T10:00:00Z", "source": "waf", "host": "web-gw-01", "actor_ip": "198.51.100.42", "principal": "anonymous", "action": "http_probe", "detail": "GET /api/users?id=1 UNION SELECT password FROM admin"},
+            {"timestamp": "2026-11-15T10:04:12Z", "source": "edr", "host": "web-gw-01", "actor_ip": "198.51.100.42", "principal": "www-data", "action": "process_exec", "detail": "/bin/sh -c curl http://169.254.169.254/latest/meta-data/iam/security-credentials/"},
+            {"timestamp": "2026-11-15T10:09:30Z", "source": "cloudtrail", "host": "aws-iam", "actor_ip": "198.51.100.42", "principal": "svc-web-role", "action": "AttachRolePolicy", "detail": "AttachRolePolicy AdministratorAccess"},
+            {"timestamp": "2026-11-15T10:15:45Z", "source": "edr", "host": "db-prod-01", "actor_ip": "10.0.4.18", "principal": "svc-web-role", "action": "lateral_ssh", "detail": "ssh root@db-prod-01 dump_db s3:getobject bulk"},
+            {"timestamp": "2026-11-15T10:22:00Z", "source": "edr", "host": "db-prod-01", "actor_ip": "10.0.4.18", "principal": "root", "action": "impact", "detail": "vssadmin delete shadows /all /quiet"},
+        ]
+        return self.dfir_correlator.correlate_incident_events(events, incident_id=incident_id)

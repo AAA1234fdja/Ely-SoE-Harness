@@ -23,6 +23,7 @@ from ely_soe.cyber.threat_hunting_sigma_yara_engine import ThreatHuntingSigmaYar
 from ely_soe.harness_squared.distributed_fleet_scheduler import FleetRepositorySpec
 from ely_soe.harness_squared.research_lab_facade import HarnessSquaredResearchLabFacade
 from ely_soe.harness_squared.stage_registry import STAGE_CATALOG
+from ely_soe.web.cyber_h2_store import CyberAndHarness2Store
 
 
 TARGET_ALIASES: Dict[str, str] = {
@@ -47,6 +48,7 @@ class CyberAndHarness2ApiController:
         self.cyber = EnterpriseCyberSuiteFacade()
         h2_db = self.data_dir / "harness2_meta_memory.sqlite"
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.store = CyberAndHarness2Store(self.data_dir / "cyber_h2_history.sqlite")
         self.h2_lab = HarnessSquaredResearchLabFacade(memory_db_path=h2_db)
         self.cicd_auditor = CICDPipelineGraphAuditor()
         self.sigma_yara = ThreatHuntingSigmaYaraEngine()
@@ -111,6 +113,8 @@ class CyberAndHarness2ApiController:
                 include_extended_analyzers=include_ext,
                 asset_criticality=crit,
             )
+            scan_id = self.store.save_cyber_scan(res)
+            res["scan_id"] = scan_id
             self._latest_cyber_scan = res
             return res
 
@@ -135,6 +139,7 @@ class CyberAndHarness2ApiController:
                 dry_run=dry_run,
                 auto_approve_hitl=auto_approve,
             )
+            self.store.save_soar_execution(res)
             self._soar_history.insert(0, res)
             self._soar_history = self._soar_history[:25]
             return res
@@ -228,6 +233,8 @@ class CyberAndHarness2ApiController:
             )
             self._latest_h2_sarif = study.get("sarif_v2_1")
             compact = {k: v for k, v in study.items() if k != "sarif_v2_1"}
+            study_id = self.store.save_h2_study(compact, sarif_doc=self._latest_h2_sarif)
+            compact["study_id"] = study_id
             self._latest_h2_study = compact
             return compact
 
@@ -275,6 +282,10 @@ class CyberAndHarness2ApiController:
     def export_latest_h2_sarif(self) -> Tuple[str, str, str]:
         with self._lock:
             if self._latest_h2_sarif is None:
+                stored = self.store.get_latest_h2_sarif()
+                if stored is not None:
+                    self._latest_h2_sarif = stored
+            if self._latest_h2_sarif is None:
                 v09 = self._resolve_authorized_target("v0_9")
                 h2_run = self.h2_lab.engine.run_adaptive_assessment(v09, target_name=v09.name, preferred_profile="fast_ci")
                 self._latest_h2_sarif = self.h2_lab.governance.export_sarif_2_1(h2_run)
@@ -283,3 +294,94 @@ class CyberAndHarness2ApiController:
                 "application/sarif+json; charset=utf-8",
                 "ely-harness2-report.sarif.json",
             )
+
+    # ------------------------------------------------------------------
+    # WAVE V CRITICAL ENDPOINTS (PERSISTENCE, AUTOPATCH, DAST, AI FIREWALL,
+    # SYSTEMIC PORTFOLIO, COUNTERFACTUAL PLAN, DIAGNOSTICS, MONOTONICITY)
+    # ------------------------------------------------------------------
+    def get_history_summary(self) -> Dict[str, Any]:
+        return self.store.get_history_summary()
+
+    def diff_cyber_scans(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        b_id = str(body.get("baseline_scan_id", "")).strip()
+        c_id = str(body.get("candidate_scan_id", "")).strip()
+        if not b_id or not c_id:
+            scans = self.store.list_cyber_scans(limit=2)
+            if len(scans) < 2:
+                raise ValueError("Provide `baseline_scan_id` and `candidate_scan_id` (or run at least 2 scans first).")
+            c_id, b_id = scans[0]["scan_id"], scans[1]["scan_id"]
+        return self.store.diff_cyber_scans(b_id, c_id)
+
+    def run_verified_autopatch(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        with self._lock:
+            res = self.cyber.run_verified_autopatch(str(target_path))
+            self.store.save_autopatch_run(res)
+            return res
+
+    def run_dast_selfcheck(self, body: Dict[str, Any], *, default_base_url: str = "http://127.0.0.1:8080") -> Dict[str, Any]:
+        base_url = str(body.get("target_url") or default_base_url).strip()
+        return self.cyber.run_live_dast_scan(base_url)
+
+    def run_llm_firewall(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        return self.cyber.run_llm_firewall_eval(
+            prompt_text=body.get("prompt_text"),
+            source_channel=str(body.get("source_channel", "user_prompt")),
+            tool_name=body.get("tool_name"),
+            tool_arguments=body.get("tool_arguments") if isinstance(body.get("tool_arguments"), dict) else None,
+            caller_trust_level=str(body.get("caller_trust_level", "UNTRUSTED_DATA")),
+        )
+
+    def run_forensic_bundle(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        with self._lock:
+            summary = self._latest_cyber_scan if (
+                self._latest_cyber_scan and Path(str(self._latest_cyber_scan.get("target_path", ""))).resolve() == target_path
+            ) else None
+            bundle = self.cyber.build_signed_forensic_bundle(str(target_path), scan_summary=summary)
+            return {k: v for k, v in bundle.items() if k != "executive_html_full"}
+
+    def run_h2_systemic_portfolio(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        budget_usd = float(body.get("budget_usd") or body.get("defense_budget_usd") or 50_000.0)
+        impact_usd = float(body.get("breach_impact_usd", 6_000_000.0))
+        with self._lock:
+            return self.h2_lab.run_systemic_defense_portfolio(
+                str(target_path), budget_usd=budget_usd, breach_impact_usd=impact_usd
+            )
+
+    def run_h2_counterfactual_plan(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        target_posture = float(body.get("target_posture", 80.0))
+        with self._lock:
+            return self.h2_lab.run_counterfactual_remediation_plan(str(target_path), target_posture=target_posture)
+
+    def run_h2_self_diagnostics(self) -> Dict[str, Any]:
+        with self._lock:
+            return self.h2_lab.run_self_diagnostics()
+
+    def run_h2_synthesize_guardrails(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        max_rules = int(body.get("max_rules", 8))
+        with self._lock:
+            return self.h2_lab.synthesize_permanent_guardrails(str(target_path), max_rules=max_rules)
+
+    def run_h2_monotonicity_proof(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        base_p = self._resolve_authorized_target(body.get("baseline") or "v0_9")
+        cand_p = self._resolve_authorized_target(body.get("candidate") or "v1_0_hardened")
+        with self._lock:
+            return self.h2_lab.prove_version_monotonicity(str(base_p), str(cand_p))
+
+    def run_h2_parallel_pareto(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        target_path = self._resolve_authorized_target(body.get("target") or body.get("target_path") or "v0_9")
+        sla_ms = int(body.get("sla_budget_ms", 5000))
+        max_stages = int(body.get("max_stages", 10))
+        with self._lock:
+            return self.h2_lab.run_pareto_parallel_schedule(
+                str(target_path), sla_budget_ms=sla_ms, max_stages=max_stages
+            )
+
+    def run_cyber_dfir_timeline(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        events = body.get("events") if isinstance(body.get("events"), list) else None
+        inc_id = str(body.get("incident_id", "INC-ELY-DFIR-001"))
+        return self.cyber.correlate_dfir_timeline(events, incident_id=inc_id)
