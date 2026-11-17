@@ -1,0 +1,8 @@
+{
+  "name": "verified-doc-formatter",
+  "version": "1.0.0",
+  "signature": "ed25519:7c41b99a20e88d3104c9f8b21a5019ef44201c90",
+  "permissions": ["fs:read:/workspace/docs/**"],
+  "entrypoint": "verified_doc_formatter",
+  "external_triggers": false
+}

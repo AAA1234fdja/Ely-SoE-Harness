@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=66.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ely-soe-harness"
+version = "1.0.0"
+description = "Photon Labs — ELY Security Lab & Security Orchestration Engine (SOE) Adversarial Cybersecurity Harness"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Photon Labs Security Engineering" }
+]
+keywords = [
+    "cybersecurity",
+    "adversarial-testing",
+    "multi-agent-security",
+    "prompt-injection",
+    "fuzzing",
+    "static-analysis",
+    "rust-security",
+    "security-orchestration",
+    "benchmarking",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[project.scripts]
+ely-soe = "ely_soe.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ely_soe*"]
+
+[tool.setuptools.package-data]
+"ely_soe.web" = ["static/*"]
